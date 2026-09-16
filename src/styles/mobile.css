@@ -1,4 +1,60 @@
-.touch-control-area { position:fixed; inset:0; z-index:1; touch-action:none; }
+/* Mobile touch & gesture controls optimization */
+html, body {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+}
+
+#game-container, #game-container canvas {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.touch-control-area {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  touch-action: none;
+}
+
+/* Touch-optimized button styling */
+button, .hud-touch-btn, .screen-btn, .selection-launch-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 @media (hover:none) and (pointer:coarse) {
-  button, .hud-touch-btn, .screen-btn { min-height: 44px; min-width: 44px; }
+  button, .hud-touch-btn, .screen-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Safe area padding for notch and home indicators */
+  #hud-top-bar {
+    padding-top: max(10px, env(safe-area-inset-top));
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  #hud-bottom-bar {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  #selection-banner {
+    top: max(80px, calc(env(safe-area-inset-top) + 60px));
+  }
 }

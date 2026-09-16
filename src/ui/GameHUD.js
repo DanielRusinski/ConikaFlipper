@@ -1,4 +1,5 @@
 import { eventBus } from '../core/EventBus.js';
+import { inputManager } from '../core/InputManager.js';
 import { GAME_CONFIG } from '../config/gameConfig.js';
 import { BALL_COLORS, BALL_CSS_COLORS } from '../materials/ballMaterials.js';
 import { ScoreDisplay } from './ScoreDisplay.js';
@@ -16,6 +17,7 @@ export class GameHUD {
     this._modifierEl = null;
     this._battleBtn = null;
     this._pauseBtn = null;
+    this._recenterBtn = null;
     this._selectionBannerEl = null;
     this._launchBtn = null;
     this._unsubs = [];
@@ -64,6 +66,7 @@ export class GameHUD {
         <div id="active-modifier"></div>
         <div style="display:flex; gap:10px; pointer-events:auto; align-items:center;">
           <button id="bomb-action-btn" class="hud-touch-btn bomb-hud-btn" style="display:none; pointer-events:auto; background:linear-gradient(180deg, rgba(50, 18, 18, 0.94), rgba(28, 8, 8, 0.98)); border:1.5px solid rgba(255, 69, 58, 0.7); border-radius:12px; padding:8px 16px; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 14px rgba(255, 69, 58, 0.35); align-items:center; gap:6px;">💣 <span id="bomb-btn-count">0</span></button>
+          <button id="recenter-btn" class="hud-touch-btn" style="display:none; pointer-events:auto; background:linear-gradient(180deg, rgba(20, 36, 60, 0.92), rgba(10, 18, 36, 0.96)); border:1.5px solid rgba(0, 229, 255, 0.5); border-radius:12px; padding:8px 14px; color:#00e5ff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 229, 255, 0.2); align-items:center; gap:5px;" title="Wyzeruj poziom stołu">🎯 Poziom</button>
           <button id="battle-menu-btn" class="hud-touch-btn" style="pointer-events:auto; background:linear-gradient(180deg, rgba(26, 36, 62, 0.92), rgba(13, 19, 36, 0.96)); border:1.5px solid rgba(120, 180, 255, 0.45); border-radius:12px; padding:8px 16px; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 180, 255, 0.2); display:inline-flex; align-items:center; gap:6px;">⚡ Battle</button>
           <button id="pause-btn" class="hud-touch-btn" style="pointer-events:auto; background:linear-gradient(180deg, rgba(26, 36, 62, 0.92), rgba(13, 19, 36, 0.96)); border:1.5px solid rgba(120, 180, 255, 0.45); border-radius:12px; padding:8px 16px; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 180, 255, 0.2); display:inline-flex; align-items:center; gap:6px;">⏸️ Pause</button>
         </div>
@@ -90,10 +93,29 @@ export class GameHUD {
     this._modifierEl = document.getElementById('active-modifier');
     this._bombBtn = document.getElementById('bomb-action-btn');
     this._bombCountSpan = document.getElementById('bomb-btn-count');
+    this._recenterBtn = document.getElementById('recenter-btn');
     this._battleBtn = document.getElementById('battle-menu-btn');
     this._pauseBtn = document.getElementById('pause-btn');
     this._selectionBannerEl = document.getElementById('selection-banner');
     this._launchBtn = document.getElementById('selection-launch-btn');
+
+    if (this._recenterBtn) {
+      if (inputManager.isGyroActive) {
+        this._recenterBtn.style.display = 'inline-flex';
+      }
+      this._recenterBtn.addEventListener('click', () => {
+        inputManager.calibrate();
+        const origHtml = this._recenterBtn.innerHTML;
+        this._recenterBtn.innerHTML = '✓ OK!';
+        this._recenterBtn.style.borderColor = '#00ffcc';
+        setTimeout(() => {
+          if (this._recenterBtn) {
+            this._recenterBtn.innerHTML = origHtml;
+            this._recenterBtn.style.borderColor = 'rgba(0, 229, 255, 0.5)';
+          }
+        }, 700);
+      });
+    }
 
     if (this._bombBtn) {
       this._bombBtn.addEventListener('click', () => {
@@ -114,6 +136,11 @@ export class GameHUD {
     });
 
     this._unsubs.push(
+      eventBus.on('input:gyroActive', () => {
+        if (this._recenterBtn) {
+          this._recenterBtn.style.display = 'inline-flex';
+        }
+      }),
       eventBus.on('score:changed', (data) => {
         this._scoreDisplay.setValue(data.score || 0);
         if (data.yellowScore !== undefined) {

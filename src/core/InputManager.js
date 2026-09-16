@@ -1,3 +1,5 @@
+import { eventBus } from './EventBus.js';
+
 class InputManager {
   constructor() {
     this.tiltX = 0;
@@ -10,12 +12,34 @@ class InputManager {
     this._currentPointerX = 0;
     this._currentPointerY = 0;
     this._actionCallbacks = [];
+
+    // Gyroscope / Device Orientation state
+    this.isGyroSupported = false;
+    this.isGyroActive = false;
+    this.isGyroEnabled = true;
+    this.isGyroPermitted = false;
+    this._hasRequestedPermission = false;
+
+    this._rawBeta = 0;
+    this._rawGamma = 0;
+    this._rawAlpha = 0;
+
+    // Ergonomic handheld resting angle in portrait (~38° pitch towards user)
+    this.baseBeta = 38;
+    this.baseGamma = 0;
+    this._hasAutoCalibrated = false;
+
+    // Angle configuration
+    this.maxTiltAngle = 18.0; // degrees deviation from base for max tilt [-1, 1]
+    this.deadzone = 1.0;     // degrees deadzone to eliminate tremor
     
     this._keydownHandler = this._onKeyDown.bind(this);
     this._keyupHandler = this._onKeyUp.bind(this);
     this._pointerdownHandler = this._onPointerDown.bind(this);
     this._pointermoveHandler = this._onPointerMove.bind(this);
     this._pointerupHandler = this._onPointerUp.bind(this);
+    this._orientationHandler = this._onDeviceOrientation.bind(this);
+    this._screenOrientationHandler = this._onScreenOrientationChange.bind(this);
   }
 
   init(canvas) {
@@ -26,11 +50,116 @@ class InputManager {
     canvas.addEventListener('pointermove', this._pointermoveHandler, { passive: false });
     canvas.addEventListener('pointerup', this._pointerupHandler, { passive: false });
     canvas.addEventListener('pointercancel', this._pointerupHandler, { passive: false });
+
+    // Request iOS orientation permission on any user touch/click gesture
+    const requestOnGesture = () => {
+      this.requestGyroPermission();
+      window.removeEventListener('pointerdown', requestOnGesture);
+      window.removeEventListener('touchstart', requestOnGesture);
+      window.removeEventListener('click', requestOnGesture);
+    };
+    window.addEventListener('pointerdown', requestOnGesture, { passive: true });
+    window.addEventListener('touchstart', requestOnGesture, { passive: true });
+    window.addEventListener('click', requestOnGesture, { passive: true });
+
+    // Directly bind orientation listeners (works out of the box on Android Chrome)
+    this._bindOrientationEvents();
+  }
+
+  async requestGyroPermission() {
+    if (this._hasRequestedPermission) return;
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      this._hasRequestedPermission = true;
+      try {
+        const response = await DeviceOrientationEvent.requestPermission();
+        if (response === 'granted') {
+          this.isGyroPermitted = true;
+          this._bindOrientationEvents();
+        } else {
+          console.log('DeviceOrientation permission denied:', response);
+        }
+      } catch (e) {
+        console.warn('DeviceOrientation requestPermission error:', e);
+      }
+    }
+  }
+
+  _bindOrientationEvents() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('deviceorientation', this._orientationHandler);
+      window.addEventListener('deviceorientation', this._orientationHandler, { passive: true });
+
+      if (window.screen && window.screen.orientation) {
+        window.screen.orientation.removeEventListener('change', this._screenOrientationHandler);
+        window.screen.orientation.addEventListener('change', this._screenOrientationHandler);
+      } else {
+        window.removeEventListener('orientationchange', this._screenOrientationHandler);
+        window.addEventListener('orientationchange', this._screenOrientationHandler);
+      }
+    }
+  }
+
+  _onDeviceOrientation(e) {
+    if (e.beta === null || e.gamma === null) return;
+
+    const wasActive = this.isGyroActive;
+    this.isGyroSupported = true;
+    this.isGyroActive = true;
+
+    this._rawBeta = e.beta;
+    this._rawGamma = e.gamma;
+    this._rawAlpha = e.alpha || 0;
+
+    if (!wasActive) {
+      eventBus.emit('input:gyroActive', { active: true });
+    }
+  }
+
+  _onScreenOrientationChange() {
+    // Reset auto-calibration when device is rotated between portrait/landscape
+    this._hasAutoCalibrated = false;
+  }
+
+  calibrate(customBeta, customGamma) {
+    if (typeof customBeta === 'number') {
+      this.baseBeta = customBeta;
+    } else if (this.isGyroActive) {
+      this.baseBeta = this._rawBeta;
+    }
+
+    if (typeof customGamma === 'number') {
+      this.baseGamma = customGamma;
+    } else if (this.isGyroActive) {
+      this.baseGamma = this._rawGamma;
+    }
+
+    this._hasAutoCalibrated = true;
+    eventBus.emit('input:calibrated', { baseBeta: this.baseBeta, baseGamma: this.baseGamma });
+  }
+
+  getScreenOrientationAngle() {
+    if (typeof window !== 'undefined') {
+      if (window.screen && window.screen.orientation && typeof window.screen.orientation.angle === 'number') {
+        return (window.screen.orientation.angle + 360) % 360;
+      }
+      if (typeof window.orientation === 'number') {
+        return (window.orientation + 360) % 360;
+      }
+    }
+    return 0;
+  }
+
+  _normalizeAngle(deg, maxAngle = 18.0, deadzone = 1.0) {
+    const abs = Math.abs(deg);
+    if (abs < deadzone) return 0;
+    const sign = deg > 0 ? 1 : -1;
+    const normalized = (abs - deadzone) / (maxAngle - deadzone);
+    return sign * Math.min(1, Math.max(0, normalized));
   }
 
   isEditableTarget(element) {
     if (!element) return false;
-    const tag = element.tagName.toUpperCase();
+    const tag = element.tagName ? element.tagName.toUpperCase() : '';
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || element.isContentEditable;
   }
 
@@ -52,7 +181,7 @@ class InputManager {
   }
 
   _onPointerDown(e) {
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     this._pointerDown = true;
     this._pointerStartX = e.clientX;
     this._pointerStartY = e.clientY;
@@ -62,14 +191,14 @@ class InputManager {
 
   _onPointerMove(e) {
     if (!this._pointerDown) return;
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     this._currentPointerX = e.clientX;
     this._currentPointerY = e.clientY;
   }
 
   _onPointerUp(e) {
     if (!this._pointerDown) return;
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     
     // If it was a quick tap without much movement, trigger action
     const dx = e.clientX - this._pointerStartX;
@@ -100,7 +229,52 @@ class InputManager {
     let targetTiltX = 0;
     let targetTiltY = 0;
 
-    if (this._pointerDown) {
+    if (this.isGyroActive && this.isGyroEnabled) {
+      // Auto-calibrate baseline on initial active frames
+      if (!this._hasAutoCalibrated) {
+        const screenAngle = this.getScreenOrientationAngle();
+        if (screenAngle === 0) {
+          if (this._rawBeta >= 15 && this._rawBeta <= 65) {
+            this.baseBeta = this._rawBeta;
+            this.baseGamma = this._rawGamma;
+          } else {
+            this.baseBeta = 38;
+            this.baseGamma = 0;
+          }
+        } else {
+          this.baseBeta = this._rawBeta;
+          this.baseGamma = this._rawGamma;
+        }
+        this._hasAutoCalibrated = true;
+      }
+
+      // Delta relative to calibrated posture
+      let deltaBeta = this._rawBeta - this.baseBeta;
+      let deltaGamma = this._rawGamma - this.baseGamma;
+
+      // Clamp deltas to prevent flip-over spikes
+      deltaBeta = Math.max(-45, Math.min(45, deltaBeta));
+      deltaGamma = Math.max(-45, Math.min(45, deltaGamma));
+
+      // Screen rotation adjustment
+      const screenAngle = this.getScreenOrientationAngle();
+      const rad = (screenAngle * Math.PI) / 180;
+      const cosA = Math.cos(rad);
+      const sinA = Math.sin(rad);
+
+      // Rotate device tilt into screen space:
+      // In 0°: screenDegX = deltaGamma, screenDegY = deltaBeta
+      // In 90°: screenDegX = deltaBeta, screenDegY = -deltaGamma
+      // In 180°: screenDegX = -deltaGamma, screenDegY = -deltaBeta
+      // In 270°: screenDegX = -deltaBeta, screenDegY = deltaGamma
+      const screenDegX = deltaGamma * cosA + deltaBeta * sinA;
+      const screenDegY = deltaBeta * cosA - deltaGamma * sinA;
+
+      // Deadzone filtering & normalized scaling [-1, 1]
+      targetTiltX = this._normalizeAngle(screenDegX, this.maxTiltAngle, this.deadzone);
+      targetTiltY = this._normalizeAngle(screenDegY, this.maxTiltAngle, this.deadzone);
+    } else if (this._pointerDown) {
+      // Pointer drag fallback (only when gyro is not active)
       const dx = this._currentPointerX - this._pointerStartX;
       const dy = this._currentPointerY - this._pointerStartY;
       const maxDrag = Math.min(window.innerWidth, window.innerHeight) * 0.25;
@@ -108,14 +282,15 @@ class InputManager {
       targetTiltX = Math.max(-1, Math.min(1, dx / maxDrag));
       targetTiltY = Math.max(-1, Math.min(1, dy / maxDrag));
     } else {
+      // Keyboard fallback (WASD / Arrows)
       if (this.keys.a || this.keys.ArrowLeft) targetTiltX -= 1;
       if (this.keys.d || this.keys.ArrowRight) targetTiltX += 1;
       if (this.keys.w || this.keys.ArrowUp) targetTiltY -= 1;
       if (this.keys.s || this.keys.ArrowDown) targetTiltY += 1;
     }
 
-    // Lerp towards target tilt
-    const lerpSpeed = 0.15;
+    // Smooth lerp towards target tilt
+    const lerpSpeed = this.isGyroActive ? 0.25 : 0.15;
     this.tiltX += (targetTiltX - this.tiltX) * lerpSpeed;
     this.tiltY += (targetTiltY - this.tiltY) * lerpSpeed;
     
@@ -132,6 +307,11 @@ class InputManager {
       this._canvas.removeEventListener('pointerup', this._pointerupHandler);
       this._canvas.removeEventListener('pointercancel', this._pointerupHandler);
     }
+    window.removeEventListener('deviceorientation', this._orientationHandler);
+    if (window.screen && window.screen.orientation) {
+      window.screen.orientation.removeEventListener('change', this._screenOrientationHandler);
+    }
+    window.removeEventListener('orientationchange', this._screenOrientationHandler);
     this._actionCallbacks = [];
   }
 }

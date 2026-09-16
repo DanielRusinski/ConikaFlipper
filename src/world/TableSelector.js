@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/gameConfig.js';
 import { eventBus } from '../core/EventBus.js';
+import { inputManager } from '../core/InputManager.js';
 import { playSound } from '../soundfx.js';
 
 export class TableSelector {
@@ -129,8 +130,8 @@ export class TableSelector {
     }
   }
 
-  _onPointerMove(e) {
-    if (!this.active || !this._camera || !this._domElement) return;
+  _getTileFromPointer(e) {
+    if (!this.active || !this._camera || !this._domElement) return null;
 
     const rect = this._domElement.getBoundingClientRect();
     this._mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -142,20 +143,43 @@ export class TableSelector {
       const gy = Math.floor((this._planeIntersect.z + this.tableHeight / 2) / this.tileHeight);
 
       if (gx >= 0 && gx < this.tilesX && gy >= 0 && gy < this.tilesY) {
-        if (gx !== this.gridX || gy !== this.gridY) {
-          this.gridX = gx;
-          this.gridY = gy;
-          this._highlightCurrent();
-          playSound(550, 0.05);
-        }
+        return { gx, gy };
       }
+    }
+    return null;
+  }
+
+  _onPointerMove(e) {
+    const tile = this._getTileFromPointer(e);
+    if (tile && (tile.gx !== this.gridX || tile.gy !== this.gridY)) {
+      this.gridX = tile.gx;
+      this.gridY = tile.gy;
+      this._updatePosition(performance.now());
+      this._highlightCurrent();
+      playSound(550, 0.05);
     }
   }
 
   _onPointerDown(e) {
     if (!this.active) return;
-    if (e.target.closest('#hud') || e.target.closest('#selection-banner')) return;
-    this.confirm();
+    if (e.target.closest && (e.target.closest('#hud') || e.target.closest('#selection-banner') || e.target.closest('#screens'))) return;
+
+    const tile = this._getTileFromPointer(e);
+    if (tile) {
+      const isSameTile = (tile.gx === this.gridX && tile.gy === this.gridY);
+      this.gridX = tile.gx;
+      this.gridY = tile.gy;
+      this._updatePosition(performance.now());
+      this._highlightCurrent();
+
+      if (isSameTile) {
+        // Tapping the currently selected tile confirms/launches
+        this.confirm();
+      } else {
+        // Tapping a different tile selects and highlights it
+        playSound(600, 0.06);
+      }
+    }
   }
 
   _onKeyDown(e) {
@@ -193,6 +217,9 @@ export class TableSelector {
       playSound(250, 0.15); // Buzzer on obstacle
       return false;
     }
+
+    // Calibrate gyro resting posture at launch moment
+    inputManager.calibrate();
 
     const worldPos = this._tileManager.getTileWorldPos(this.gridX, this.gridY);
     const spawnData = {
