@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>OPT Flipper</title>
+  <link rel="stylesheet" href="src/styles/main.css?v=2.2">
+  <link rel="stylesheet" href="src/styles/hud.css?v=2.2">
+  <link rel="stylesheet" href="src/styles/screens.css?v=2.2">
+  <link rel="stylesheet" href="src/styles/panels.css?v=2.2">
+  <link rel="stylesheet" href="src/styles/mobile.css?v=2.2">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+        "tweakpane": "https://unpkg.com/tweakpane@4.0.5/dist/tweakpane.min.js",
+        "animejs": "./src/libs/animeWrapper.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="game-container"></div>
+  <div id="ui-overlay">
+    <div id="hud"></div>
+    <div id="screens"></div>
+  </div>
+  <div id="label-container"></div>
+  <div id="panels"></div>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
