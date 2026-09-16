@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Labyrinth Physics Test - Selector & Start</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #DAD5D0; }
+        canvas { display: block; }
+        #instructions {
+            position: absolute; top: 10px; left: 10px; color: white;
+            font-family: sans-serif; pointer-events: none; text-shadow: 1px 1px 2px black;
+        }
+        #info {
+            position: absolute; top: 35px; left: 10px; color: #4af;
+            font-family: sans-serif; pointer-events: none; text-shadow: 1px 1px 2px black;
+            font-weight: bold;
+        }
+        #sound-overlay {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 255, 204, 0.2); border: 2px solid #00ffcc; color: #fff;
+            padding: 10px 20px; font-family: sans-serif; font-weight: bold; border-radius: 8px;
+            cursor: pointer; text-shadow: 1px 1px 2px black; z-index: 10;
+            transition: background 0.3s;
+        }
+        #sound-overlay:hover {
+            background: rgba(0, 255, 204, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div id="instructions">Wybierz pole strzałkami/WASD i wciśnij ENTER/SPACJĘ, aby upuścić kulkę! (TAB - zmiana kulki)</div>
+    <div id="info">Tryb wyboru pola startowego</div>
+    
+    <button id="sound-overlay">🔊 Kliknij tutaj, aby włączyć dźwięki gry</button>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+        
+        import { world, BR_METAL, BR_WATER } from './physics.js';
+        import { tableCameraController } from './camera.js';
+        import { gameField } from './field.js';
+        import { tableSelector } from './selector.js';
+        import { cellParticles } from './fx_cells.js'; // Import modułu cząsteczek
+        import { playSound } from './soundfx.js';
+
+        document.getElementById('sound-overlay').addEventListener('click', (e) => {
+            playSound(600, 0.1);
+            e.target.style.display = 'none';
+        });
+
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, width / height, 0.01, 10);
+        
+        world.active = false;
+        tableCameraController.init(camera, world.px, world.py);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Wygładzanie krawędzi i obsługa urządzeń Retina/HiDPI
+        renderer.shadowMap.enabled = false;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.setClearColor(0xDAD5D0);
+        document.body.appendChild(renderer.domElement);
+
+        const renderScene = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 0.6, 0.4, 0.85);
+        
+        // Definicja shadera ziarna na GPU (GLSL)
+        const FilmGrainShader = {
+            uniforms: {
+                'tDiffuse': { value: null },
+                'time': { value: 0.0 },
+                'intensity': { value: 0.08 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float time;
+                uniform float intensity;
+                varying vec2 vUv;
+
+                float random(vec2 co) {
+                    return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+                }
+
+                void main() {
+                    vec4 color = texture2D(tDiffuse, vUv);
+                    float noise = (random(vUv * time) - 0.5) * intensity;
+                    color.rgb += noise;
+                    gl_FragColor = color;
+                }
+            `
+        };
+
+        const grainPass = new ShaderPass(FilmGrainShader);
+
+        const composer = new EffectComposer(renderer);
+        composer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Wygładzanie dla warstwy post-processingu
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+        composer.addPass(grainPass);
+
+        new EXRLoader().load('exr/OPT_EXR_AmbientLight001.exr', (texture) => {
+            texture.mapping = THREE.EquirectangularReflectionMapping;
+            scene.environment = texture;
+        }, undefined, (error) => {
+            console.error('Błąd ładowania EXR:', error);
+        });
+
+        const boardGroup = new THREE.Group();
+        scene.add(boardGroup);
+
+        const metalMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.9, roughness: 0.1 });
+        const waterMat = new THREE.MeshStandardMaterial({ color: 0x3388ff, metalness: 0.2, roughness: 0.3 });
+
+        const metalMesh = new THREE.Mesh(new THREE.SphereGeometry(BR_METAL, 32, 32), metalMat);
+        const waterMesh = new THREE.Mesh(new THREE.SphereGeometry(BR_WATER, 32, 32), waterMat);
+
+        let activeMesh = metalMesh;
+        // Kulka nie jest dodawana do boardGroup przed startem (jest ukryta)
+
+        const planeMesh = gameField.createFieldMesh();
+        boardGroup.add(planeMesh);
+
+        const selectorMesh = tableSelector.createSelectorMesh();
+        boardGroup.add(selectorMesh);
+
+        let gameStarted = false;
+
+        const physicsDt = 1 / 480;
+        let accumulator = 0;
+        let lastTime = performance.now();
+
+        const MAX_TILT = 15 * Math.PI / 180;
+        let targetTiltX = 0, targetTiltY = 0;
+        let currentTiltX = 0, currentTiltY = 0;
+
+        const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+
+        window.addEventListener('keydown', (e) => {
+            if (!gameStarted) {
+                const startedNow = tableSelector.handleInput(e);
+                if (startedNow) {
+                    gameStarted = true;
+                    selectorMesh.visible = false;
+
+                    playSound(1200, 0.3);
+
+                    const spawn = tableSelector.getSpawnCoordinates();
+                    world.px = spawn.x;
+                    world.py = spawn.y;
+                    world.vx = 0;
+                    world.vy = 0;
+                    world.active = true;
+
+                    // Dodanie kulki na planszę po zatwierdzeniu startu
+                    boardGroup.add(activeMesh);
+
+                    document.getElementById('instructions').innerText = 'Użyj strzałek lub WASD, aby przechylać stół. (TAB - zmiana kulki)';
+                    document.getElementById('info').innerText = 'Gra w toku!';
+                }
+                return;
+            }
+
+            if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
+            
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                boardGroup.remove(activeMesh);
+                
+                const newType = world.toggleBallType();
+                if (newType === 'water') {
+                    activeMesh = waterMesh;
+                    document.getElementById('info').innerText = 'Obecny rodzaj: Duża kula';
+                } else {
+                    activeMesh = metalMesh;
+                    document.getElementById('info').innerText = 'Obecny rodzaj: Metalowa kula';
+                }
+                boardGroup.add(activeMesh);
+            }
+        });
+
+        window.addEventListener('keyup', (e) => { if (keys.hasOwnProperty(e.key)) keys[e.key] = false; });
+
+        function animate(time) {
+            requestAnimationFrame(animate);
+
+            let frameTime = (time - lastTime) / 1000;
+            lastTime = time;
+            if (frameTime > 0.1) frameTime = 0.1; 
+            
+            if (gameStarted) {
+                targetTiltX = 0; targetTiltY = 0;
+                if (keys.ArrowLeft || keys.a) targetTiltX = -MAX_TILT;
+                if (keys.ArrowRight || keys.d) targetTiltX = MAX_TILT;
+                if (keys.ArrowUp || keys.w) targetTiltY = -MAX_TILT;
+                if (keys.ArrowDown || keys.s) targetTiltY = MAX_TILT;
+
+                currentTiltX += (targetTiltX - currentTiltX) * (frameTime * 10);
+                currentTiltY += (targetTiltY - currentTiltY) * (frameTime * 10);
+
+                world.setTilt(currentTiltX, currentTiltY);
+
+                boardGroup.rotation.z = -currentTiltX; 
+                boardGroup.rotation.x = currentTiltY;
+
+                accumulator += frameTime;
+                while (accumulator >= physicsDt) {
+                    world.step(physicsDt);
+                    accumulator -= physicsDt;
+                }
+
+                gameField.checkAndUpdate(world.px, world.py, frameTime);
+
+                const currentBR = world.getRadius();
+                activeMesh.position.x = world.px - (0.514 / 2);
+                activeMesh.position.y = currentBR;
+                activeMesh.position.z = world.py - (1.07 / 2);
+
+                tableCameraController.update(camera, world.px, world.py, frameTime);
+            } else {
+                tableSelector.animate(time);
+                cellParticles.update(frameTime); // Płynna aktualizacja cząsteczek na starcie (jeśli jakieś zostały)
+                
+                const pulse = Math.sin(time * 0.005) * 0.3 + 0.7;
+                selectorMesh.material.emissiveIntensity = pulse;
+
+                const spawn = tableSelector.getSpawnCoordinates();
+                tableCameraController.update(camera, spawn.x, spawn.y, frameTime);
+            }
+
+            // Aktualizacja czasu dla shadera ziarna GPU
+            grainPass.uniforms['time'].value = time * 0.001;
+
+            composer.render();
+        }
+
+        window.addEventListener('resize', () => {
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            composer.setSize(w, h);
+            composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        });
+
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>

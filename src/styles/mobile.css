@@ -1,0 +1,4 @@
+.touch-control-area { position:fixed; inset:0; z-index:1; touch-action:none; }
+@media (hover:none) and (pointer:coarse) {
+  button, .hud-touch-btn, .screen-btn { min-height: 44px; min-width: 44px; }
+}

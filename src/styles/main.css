@@ -1,0 +1,11 @@
+* { margin:0; padding:0; box-sizing:border-box; }
+body { overflow:hidden; background:#1a1a2e; font-family: 'Segoe UI', system-ui, sans-serif; color:#fff; }
+#game-container { position:fixed; inset:0; z-index:0; }
+#game-container canvas { display:block; width:100%; height:100%; }
+#ui-overlay { position:fixed; inset:0; z-index:20; pointer-events:none; }
+#ui-overlay > * { pointer-events:auto; }
+#label-container { position:fixed; inset:0; z-index:5; pointer-events:none; overflow:hidden; }
+.label-wrapper { position:absolute; pointer-events:none; user-select:none; will-change:transform; transform-origin:center center; }
+#panels { position:fixed; z-index:100; }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
