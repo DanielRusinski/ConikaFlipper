@@ -57,7 +57,6 @@ export class StageClearScreen {
       eventBus.emit('ui:nextStageRequested');
     };
     nextBtn.addEventListener('click', triggerNext);
-    nextBtn.addEventListener('touchend', triggerNext, { passive: false });
   }
 
   show(data = {}) {

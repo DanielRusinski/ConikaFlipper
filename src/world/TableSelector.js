@@ -150,6 +150,7 @@ export class TableSelector {
   }
 
   _onPointerMove(e) {
+    this.pointerType = e.pointerType; // 'mouse' | 'touch' | 'pen'
     const tile = this._getTileFromPointer(e);
     if (tile && (tile.gx !== this.gridX || tile.gy !== this.gridY)) {
       this.gridX = tile.gx;
@@ -162,8 +163,9 @@ export class TableSelector {
 
   _onPointerDown(e) {
     if (!this.active) return;
-    if (e.target.closest && (e.target.closest('#hud') || e.target.closest('#selection-banner') || e.target.closest('#screens'))) return;
+    if (e.target && e.target.closest && (e.target.closest('#hud') || e.target.closest('#selection-banner') || e.target.closest('#screens'))) return;
 
+    this.pointerType = e.pointerType; // 'mouse' | 'touch' | 'pen'
     const tile = this._getTileFromPointer(e);
     if (tile) {
       const isSameTile = (tile.gx === this.gridX && tile.gy === this.gridY);
@@ -173,10 +175,10 @@ export class TableSelector {
       this._highlightCurrent();
 
       if (isSameTile) {
-        // Tapping the currently selected tile confirms/launches
+        // Tapping/clicking with mouse, touch, or pen on the selected tile confirms/launches
         this.confirm();
       } else {
-        // Tapping a different tile selects and highlights it
+        // Tapping/clicking a new tile selects and highlights it
         playSound(600, 0.06);
       }
     }

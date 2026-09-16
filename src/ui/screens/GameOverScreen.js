@@ -39,7 +39,6 @@ export class GameOverScreen {
       eventBus.emit('ui:restartRequested');
     };
     restartBtn.addEventListener('click', triggerRestart);
-    restartBtn.addEventListener('touchend', triggerRestart, { passive: false });
     
     const titleBtn = this._el.querySelector('#go-title-btn');
     const triggerTitle = (e) => {
@@ -47,7 +46,6 @@ export class GameOverScreen {
       eventBus.emit('ui:titleRequested');
     };
     titleBtn.addEventListener('click', triggerTitle);
-    titleBtn.addEventListener('touchend', triggerTitle, { passive: false });
   }
 
   show(data = { score:0, tilesDiscovered:0, coinsCollected:0 }) {

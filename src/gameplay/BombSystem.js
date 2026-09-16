@@ -221,7 +221,9 @@ export class BombSystem {
     _onPointerDown(e) {
         if (!this._targetingActive || this._bombCount <= 0) return;
         // Ignore clicks on HUD buttons
-        if (e.target.closest('#hud') || e.target.closest('#screens') || e.target.closest('#panels')) return;
+        if (e.target && e.target.closest && (e.target.closest('#hud') || e.target.closest('#screens') || e.target.closest('#panels'))) return;
+
+        this.pointerType = e.pointerType; // 'mouse' | 'touch' | 'pen'
 
         const rect = this._domElement.getBoundingClientRect();
         this._mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;

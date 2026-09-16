@@ -292,32 +292,47 @@ export class Game {
             this._targetCameraZoom = THREE.MathUtils.clamp(this._targetCameraZoom + zoomDelta, this._minZoom, this._maxZoom);
         }, { passive: false });
 
-        let initialTouchDist = null;
+        // Pinch-to-zoom using unified Pointer Events (works for mouse, touch screen, and stylus/pen)
+        const activePointers = new Map();
+        let initialPinchDist = null;
         let initialZoom = 1.0;
-        this.renderer.domElement.addEventListener('touchstart', (e) => {
-            if (e.touches.length === 2) {
-                const dx = e.touches[0].clientX - e.touches[1].clientX;
-                const dy = e.touches[0].clientY - e.touches[1].clientY;
-                initialTouchDist = Math.hypot(dx, dy);
+
+        this.renderer.domElement.addEventListener('pointerdown', (e) => {
+            activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
+            if (activePointers.size === 2) {
+                const pts = Array.from(activePointers.values());
+                const dx = pts[0].x - pts[1].x;
+                const dy = pts[0].y - pts[1].y;
+                initialPinchDist = Math.hypot(dx, dy);
                 initialZoom = this._targetCameraZoom;
             }
         }, { passive: true });
 
-        this.renderer.domElement.addEventListener('touchmove', (e) => {
-            if (e.touches.length === 2 && initialTouchDist) {
-                const dx = e.touches[0].clientX - e.touches[1].clientX;
-                const dy = e.touches[0].clientY - e.touches[1].clientY;
+        this.renderer.domElement.addEventListener('pointermove', (e) => {
+            if (activePointers.has(e.pointerId)) {
+                activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
+            }
+            if (activePointers.size === 2 && initialPinchDist) {
+                const pts = Array.from(activePointers.values());
+                const dx = pts[0].x - pts[1].x;
+                const dy = pts[0].y - pts[1].y;
                 const dist = Math.hypot(dx, dy);
                 if (dist > 10) {
-                    const factor = initialTouchDist / dist;
+                    const factor = initialPinchDist / dist;
                     this._targetCameraZoom = THREE.MathUtils.clamp(initialZoom * factor, this._minZoom, this._maxZoom);
                 }
             }
         }, { passive: true });
 
-        this.renderer.domElement.addEventListener('touchend', (e) => {
-            if (e.touches.length < 2) initialTouchDist = null;
-        }, { passive: true });
+        const onPointerRelease = (e) => {
+            activePointers.delete(e.pointerId);
+            if (activePointers.size < 2) {
+                initialPinchDist = null;
+            }
+        };
+
+        this.renderer.domElement.addEventListener('pointerup', onPointerRelease, { passive: true });
+        this.renderer.domElement.addEventListener('pointercancel', onPointerRelease, { passive: true });
 
         // 19. Event listeners
         window.addEventListener('resize', this._resizeHandler);

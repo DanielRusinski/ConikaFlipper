@@ -38,7 +38,6 @@ export class PauseScreen {
       eventBus.emit('ui:resumeRequested');
     };
     resumeBtn.addEventListener('click', triggerResume);
-    resumeBtn.addEventListener('touchend', triggerResume, { passive: false });
 
     const settingsBtn = this._el.querySelector('#pause-settings-btn');
     const triggerSettings = (e) => {
@@ -46,7 +45,6 @@ export class PauseScreen {
       eventBus.emit('ui:settingsRequested');
     };
     settingsBtn.addEventListener('click', triggerSettings);
-    settingsBtn.addEventListener('touchend', triggerSettings, { passive: false });
     
     const restartBtn = this._el.querySelector('#pause-restart-btn');
     const triggerRestart = (e) => {
@@ -54,7 +52,6 @@ export class PauseScreen {
       eventBus.emit('ui:restartRequested');
     };
     restartBtn.addEventListener('click', triggerRestart);
-    restartBtn.addEventListener('touchend', triggerRestart, { passive: false });
     
     const quitBtn = this._el.querySelector('#pause-quit-btn');
     const triggerQuit = (e) => {
@@ -62,7 +59,6 @@ export class PauseScreen {
       eventBus.emit('ui:titleRequested');
     };
     quitBtn.addEventListener('click', triggerQuit);
-    quitBtn.addEventListener('touchend', triggerQuit, { passive: false });
   }
 
   show() {

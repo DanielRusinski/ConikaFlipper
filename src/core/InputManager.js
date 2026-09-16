@@ -13,6 +13,14 @@ class InputManager {
     this._currentPointerY = 0;
     this._actionCallbacks = [];
 
+    // Pointer Events tracking: unified for mouse, touchscreen, and stylus/pen
+    this._activePointerId = null;
+    this.pointerType = null;      // 'mouse' | 'touch' | 'pen'
+    this.pointerPressure = 0;     // 0..1 (stylus / touch pressure)
+    this.pointerTiltX = 0;        // degrees -90..90 (stylus tilt)
+    this.pointerTiltY = 0;        // degrees -90..90 (stylus tilt)
+    this.pointerTwist = 0;        // degrees 0..359 (stylus rotation)
+
     // Gyroscope / Device Orientation state
     this.isGyroSupported = false;
     this.isGyroActive = false;
@@ -38,6 +46,7 @@ class InputManager {
     this._pointerdownHandler = this._onPointerDown.bind(this);
     this._pointermoveHandler = this._onPointerMove.bind(this);
     this._pointerupHandler = this._onPointerUp.bind(this);
+    this._pointercancelHandler = this._onPointerCancel.bind(this);
     this._orientationHandler = this._onDeviceOrientation.bind(this);
     this._screenOrientationHandler = this._onScreenOrientationChange.bind(this);
   }
@@ -46,21 +55,19 @@ class InputManager {
     this._canvas = canvas;
     window.addEventListener('keydown', this._keydownHandler);
     window.addEventListener('keyup', this._keyupHandler);
+
+    // Pointer Events API: handles mouse, touchscreen, and stylus (pen) uniformly
     canvas.addEventListener('pointerdown', this._pointerdownHandler, { passive: false });
     canvas.addEventListener('pointermove', this._pointermoveHandler, { passive: false });
     canvas.addEventListener('pointerup', this._pointerupHandler, { passive: false });
-    canvas.addEventListener('pointercancel', this._pointerupHandler, { passive: false });
+    canvas.addEventListener('pointercancel', this._pointercancelHandler, { passive: false });
 
-    // Request iOS orientation permission on any user touch/click gesture
+    // Request iOS orientation permission on any user pointerdown gesture (mouse, touch, or pen)
     const requestOnGesture = () => {
       this.requestGyroPermission();
       window.removeEventListener('pointerdown', requestOnGesture);
-      window.removeEventListener('touchstart', requestOnGesture);
-      window.removeEventListener('click', requestOnGesture);
     };
     window.addEventListener('pointerdown', requestOnGesture, { passive: true });
-    window.addEventListener('touchstart', requestOnGesture, { passive: true });
-    window.addEventListener('click', requestOnGesture, { passive: true });
 
     // Directly bind orientation listeners (works out of the box on Android Chrome)
     this._bindOrientationEvents();
@@ -181,24 +188,57 @@ class InputManager {
   }
 
   _onPointerDown(e) {
+    // Only track one primary pointer at a time for board tilt/drag
+    if (this._activePointerId !== null && this._activePointerId !== e.pointerId) return;
+
     if (e.cancelable) e.preventDefault();
+    this._activePointerId = e.pointerId;
+    this.pointerType = e.pointerType; // 'mouse' | 'touch' | 'pen'
+    this.pointerPressure = typeof e.pressure === 'number' ? e.pressure : 0.5;
+    this.pointerTiltX = e.tiltX || 0;
+    this.pointerTiltY = e.tiltY || 0;
+    this.pointerTwist = e.twist || 0;
+
     this._pointerDown = true;
     this._pointerStartX = e.clientX;
     this._pointerStartY = e.clientY;
     this._currentPointerX = e.clientX;
     this._currentPointerY = e.clientY;
+
+    // Use Pointer Capture to guarantee continuous tracking even if mouse/finger/stylus exits the canvas
+    if (this._canvas && typeof this._canvas.setPointerCapture === 'function') {
+      try {
+        this._canvas.setPointerCapture(e.pointerId);
+      } catch (err) {}
+    }
   }
 
   _onPointerMove(e) {
     if (!this._pointerDown) return;
+    if (this._activePointerId !== null && this._activePointerId !== e.pointerId) return;
     if (e.cancelable) e.preventDefault();
+
+    this.pointerPressure = typeof e.pressure === 'number' ? e.pressure : 0.5;
+    this.pointerTiltX = e.tiltX || 0;
+    this.pointerTiltY = e.tiltY || 0;
+    this.pointerTwist = e.twist || 0;
+
     this._currentPointerX = e.clientX;
     this._currentPointerY = e.clientY;
   }
 
   _onPointerUp(e) {
-    if (!this._pointerDown) return;
+    if (this._activePointerId !== null && this._activePointerId !== e.pointerId) return;
     if (e.cancelable) e.preventDefault();
+
+    // Release pointer capture
+    if (this._canvas && typeof this._canvas.releasePointerCapture === 'function') {
+      try {
+        if (this._canvas.hasPointerCapture && this._canvas.hasPointerCapture(e.pointerId)) {
+          this._canvas.releasePointerCapture(e.pointerId);
+        }
+      } catch (err) {}
+    }
     
     // If it was a quick tap without much movement, trigger action
     const dx = e.clientX - this._pointerStartX;
@@ -208,6 +248,24 @@ class InputManager {
     }
     
     this._pointerDown = false;
+    this._activePointerId = null;
+    this.pointerPressure = 0;
+  }
+
+  _onPointerCancel(e) {
+    if (this._activePointerId !== null && this._activePointerId !== e.pointerId) return;
+
+    if (this._canvas && typeof this._canvas.releasePointerCapture === 'function') {
+      try {
+        if (this._canvas.hasPointerCapture && this._canvas.hasPointerCapture(e.pointerId)) {
+          this._canvas.releasePointerCapture(e.pointerId);
+        }
+      } catch (err) {}
+    }
+
+    this._pointerDown = false;
+    this._activePointerId = null;
+    this.pointerPressure = 0;
   }
 
   _triggerAction() {
@@ -305,7 +363,7 @@ class InputManager {
       this._canvas.removeEventListener('pointerdown', this._pointerdownHandler);
       this._canvas.removeEventListener('pointermove', this._pointermoveHandler);
       this._canvas.removeEventListener('pointerup', this._pointerupHandler);
-      this._canvas.removeEventListener('pointercancel', this._pointerupHandler);
+      this._canvas.removeEventListener('pointercancel', this._pointercancelHandler);
     }
     window.removeEventListener('deviceorientation', this._orientationHandler);
     if (window.screen && window.screen.orientation) {

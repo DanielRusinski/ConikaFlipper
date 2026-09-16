@@ -42,7 +42,6 @@ export class TitleScreen {
       eventBus.emit('ui:startRequested');
     };
     playBtn.addEventListener('click', triggerStart);
-    playBtn.addEventListener('touchend', triggerStart, { passive: false });
     
     const eqBtn = this._el.querySelector('#equipment-btn');
     const triggerEq = (e) => {
@@ -50,7 +49,6 @@ export class TitleScreen {
       eventBus.emit('ui:equipmentRequested');
     };
     eqBtn.addEventListener('click', triggerEq);
-    eqBtn.addEventListener('touchend', triggerEq, { passive: false });
 
     const setBtn = this._el.querySelector('#settings-btn');
     const triggerSet = (e) => {
@@ -58,7 +56,6 @@ export class TitleScreen {
       eventBus.emit('ui:settingsRequested');
     };
     setBtn.addEventListener('click', triggerSet);
-    setBtn.addEventListener('touchend', triggerSet, { passive: false });
   }
 
   show(data) {

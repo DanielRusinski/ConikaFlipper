@@ -61,7 +61,6 @@ export class EquipmentScreen {
         this._selectBall(type);
       };
       opt.addEventListener('click', selectHandler);
-      opt.addEventListener('touchend', selectHandler);
       grid.appendChild(opt);
       this._options.push(opt);
     });
@@ -77,7 +76,6 @@ export class EquipmentScreen {
       eventBus.emit('ui:equipmentBack');
     };
     backBtn.addEventListener('click', triggerBack);
-    backBtn.addEventListener('touchend', triggerBack, { passive: false });
   }
 
   show(data = { selectedBall: 'brass' }) {
