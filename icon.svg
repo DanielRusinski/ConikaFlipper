@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0c1024" />
+      <stop offset="100%" stop-color="#1b2446" />
+    </linearGradient>
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00ffff" />
+      <stop offset="100%" stop-color="#0066ff" />
+    </linearGradient>
+    <radialGradient id="ballGrad" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="40%" stop-color="#ffd700" />
+      <stop offset="85%" stop-color="#b8860b" />
+      <stop offset="100%" stop-color="#4a3500" />
+    </radialGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  
+  <rect width="512" height="512" rx="96" fill="url(#bg)" />
+  <rect x="40" y="40" width="432" height="432" rx="64" fill="none" stroke="url(#borderGrad)" stroke-width="8" opacity="0.6" />
+  
+  <!-- Table Flipper Lines -->
+  <path d="M120 400 L200 430" stroke="#00ffff" stroke-width="12" stroke-linecap="round" opacity="0.8" />
+  <path d="M392 400 L312 430" stroke="#00ffff" stroke-width="12" stroke-linecap="round" opacity="0.8" />
+  
+  <!-- Glowing Bumper -->
+  <circle cx="256" cy="180" r="48" fill="#142440" stroke="#00ffcc" stroke-width="8" filter="url(#glow)" />
+  <circle cx="256" cy="180" r="24" fill="#00ffcc" opacity="0.8" />
+  
+  <!-- Pinball / Ball -->
+  <circle cx="256" cy="300" r="40" fill="url(#ballGrad)" filter="url(#glow)" />
+</svg>

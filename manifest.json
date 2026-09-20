@@ -1,0 +1,17 @@
+{
+  "name": "OPT Anti Flipper",
+  "short_name": "OPT Flipper",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "portrait-primary",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "description": "Retro futuristic tilt flipper pinball game with gyroscope controls",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -4,11 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>OPT Flipper</title>
-  <link rel="stylesheet" href="src/styles/main.css?v=2.2">
-  <link rel="stylesheet" href="src/styles/hud.css?v=2.2">
-  <link rel="stylesheet" href="src/styles/screens.css?v=2.2">
-  <link rel="stylesheet" href="src/styles/panels.css?v=2.2">
-  <link rel="stylesheet" href="src/styles/mobile.css?v=2.2">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="screen-orientation" content="portrait">
+  <meta name="x5-orientation" content="portrait">
+  <link rel="stylesheet" href="src/styles/main.css?v=2.3">
+  <link rel="stylesheet" href="src/styles/hud.css?v=2.3">
+  <link rel="stylesheet" href="src/styles/screens.css?v=2.3">
+  <link rel="stylesheet" href="src/styles/panels.css?v=2.3">
+  <link rel="stylesheet" href="src/styles/mobile.css?v=2.3">
   <script type="importmap">
     {
       "imports": {
@@ -25,6 +33,14 @@
   <div id="ui-overlay">
     <div id="hud"></div>
     <div id="screens"></div>
+    <div id="landscape-notice" class="landscape-notice" style="display:none;">
+      <div class="landscape-notice-box">
+        <div class="landscape-notice-icon">📱 ↺</div>
+        <div class="landscape-notice-title">Obróć telefon do pionu</div>
+        <div class="landscape-notice-sub">Gra działa w trybie pionowym z kontrolą żyroskopu.</div>
+        <button id="landscape-lock-btn" class="landscape-lock-btn" type="button">📱 Zablokuj pion w pełnym ekranie</button>
+      </div>
+    </div>
   </div>
   <div id="label-container"></div>
   <div id="panels"></div>
