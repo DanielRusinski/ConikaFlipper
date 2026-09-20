@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GRAPHICS_CONFIG } from '../config/graphicsConfig.js';
 
 export class ShadowSystem {
     constructor() {
@@ -12,8 +13,9 @@ export class ShadowSystem {
         this.scene = scene;
 
         this.keyLight.castShadow = true;
-        this.keyLight.shadow.mapSize.width = 2048;
-        this.keyLight.shadow.mapSize.height = 2048;
+        const initialSize = GRAPHICS_CONFIG.isMobile ? 512 : 1024;
+        this.keyLight.shadow.mapSize.width = initialSize;
+        this.keyLight.shadow.mapSize.height = initialSize;
         this.keyLight.shadow.bias = -0.0004;
         this.keyLight.shadow.normalBias = 0.015;
         this.keyLight.shadow.camera.near = 0.2;
@@ -29,7 +31,10 @@ export class ShadowSystem {
     }
 
     setQuality(qualityConfig) {
-        const shadowMapSize = qualityConfig.shadowMapSize || 1024;
+        if (qualityConfig.shadows !== undefined) {
+            this.setEnabled(qualityConfig.shadows);
+        }
+        const shadowMapSize = qualityConfig.shadowMapSize || (GRAPHICS_CONFIG.isMobile ? 512 : 1024);
         if (this.keyLight && this.keyLight.shadow.mapSize.width !== shadowMapSize) {
             this.keyLight.shadow.mapSize.width = shadowMapSize;
             this.keyLight.shadow.mapSize.height = shadowMapSize;

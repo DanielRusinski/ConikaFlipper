@@ -36,16 +36,18 @@ export class BallController {
         this._collisionSystem.setTilt(tiltX, tiltY);
         
         const effectiveDt = (gameplayDt !== undefined) ? gameplayDt : dt;
-        this._accumulator += effectiveDt;
+        // Clamp accumulator to at most 0.04s to avoid spiral of death on frame stutters
+        this._accumulator = Math.min(this._accumulator + effectiveDt, 0.04);
         const maxPhysicsDt = GAME_CONFIG.physics.physicsDt;
         
-        while (this._accumulator >= maxPhysicsDt) {
+        let steps = 0;
+        while (this._accumulator >= maxPhysicsDt && steps < 6) {
             this._collisionSystem.step(maxPhysicsDt);
             this._accumulator -= maxPhysicsDt;
+            steps++;
         }
 
-        // When in slow motion, effectiveDt is small (< maxPhysicsDt).
-        // Step remaining accumulator smoothly so the ball glides with silky smooth motion without stutter
+        // When in slow motion or remainder, step remaining accumulator smoothly
         if (this._accumulator > 0.00001) {
             this._collisionSystem.step(this._accumulator);
             this._accumulator = 0;

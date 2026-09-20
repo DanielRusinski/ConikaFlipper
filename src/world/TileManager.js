@@ -34,7 +34,7 @@ export class TileManager {
         const totalTiles = this.tilesX * this.tilesY;
         this.instancedMesh = new THREE.InstancedMesh(geometry, material, totalTiles);
         this.instancedMesh.receiveShadow = true;
-        this.instancedMesh.castShadow = true;
+        this.instancedMesh.castShadow = false; // Floor tiles do not cast shadows
         
         const defaultColor = new THREE.Color(TILE_COLORS.default);
         

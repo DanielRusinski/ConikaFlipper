@@ -9,7 +9,8 @@ export const QUALITY_LEVELS = {
 
 class QualityManager {
   constructor() {
-    this.level = QUALITY_LEVELS.HIGH;
+    const isMobile = GRAPHICS_CONFIG.isMobile;
+    this.level = isMobile ? QUALITY_LEVELS.MEDIUM : QUALITY_LEVELS.HIGH;
     this.config = GRAPHICS_CONFIG.quality[this.level];
     this._autoEnabled = GRAPHICS_CONFIG.adaptiveQuality.enabled;
     this._lowFrameCount = 0;

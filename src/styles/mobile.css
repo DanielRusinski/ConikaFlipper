@@ -133,3 +133,25 @@ button, .hud-touch-btn, .screen-btn, .selection-launch-btn {
   transform: scale(0.95);
 }
 
+/* Disable expensive backdrop-filter on mobile touch devices to eliminate GPU compositor stalls */
+@media (hover: none) and (pointer: coarse), (max-width: 768px) {
+  *, *::before, *::after {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .hud-item, 
+  .score-card, 
+  .tiles-card, 
+  .coin-counter, 
+  .hud-touch-btn, 
+  .battle-orb-btn, 
+  .screen-backdrop, 
+  .battle-menu-panel,
+  .landscape-notice,
+  .landscape-notice-box {
+    background: rgba(12, 18, 34, 0.95) !important;
+  }
+}
+
+

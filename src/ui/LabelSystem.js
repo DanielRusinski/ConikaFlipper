@@ -133,6 +133,8 @@ export class LabelSystem {
   }
 
   update(sceneOrCamera, cameraOrRenderer) {
+    if (this._labels.size === 0) return;
+
     let scene = sceneOrCamera;
     let camera = cameraOrRenderer;
     if (sceneOrCamera && sceneOrCamera.isCamera) {

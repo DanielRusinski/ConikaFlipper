@@ -35,12 +35,13 @@ export class RendererManager {
             this.renderer.setClearColor(new THREE.Color(defaultPreset.background));
         }
         
-        const pixelRatio = Math.min(window.devicePixelRatio, GRAPHICS_CONFIG.pixelRatioCap || 2);
+        const maxCap = GRAPHICS_CONFIG.pixelRatioCap || (GRAPHICS_CONFIG.isMobile ? 1.15 : 2);
+        const pixelRatio = Math.min(window.devicePixelRatio, maxCap);
         this.renderer.setPixelRatio(pixelRatio);
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         
         this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.shadowMap.type = GRAPHICS_CONFIG.isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
         
         if (GRAPHICS_CONFIG.fog && GRAPHICS_CONFIG.fog.enabled && defaultPreset && defaultPreset.fog) {
             this.scene.fog = new THREE.Fog(
@@ -56,12 +57,14 @@ export class RendererManager {
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
         
-        const pixelRatio = Math.min(window.devicePixelRatio, GRAPHICS_CONFIG.pixelRatioCap || 2);
+        const maxCap = GRAPHICS_CONFIG.pixelRatioCap || (GRAPHICS_CONFIG.isMobile ? 1.15 : 2);
+        const pixelRatio = Math.min(window.devicePixelRatio, maxCap);
         this.renderer.setPixelRatio(pixelRatio);
     }
 
     setQuality(qualityConfig) {
-        const pixelRatio = Math.min(window.devicePixelRatio, qualityConfig.pixelRatioCap || GRAPHICS_CONFIG.pixelRatioCap || 2);
+        const maxCap = Math.min(GRAPHICS_CONFIG.pixelRatioCap, qualityConfig.pixelRatio || 2);
+        const pixelRatio = Math.min(window.devicePixelRatio, maxCap);
         this.renderer.setPixelRatio(pixelRatio);
         if (qualityConfig.shadows !== undefined) {
             this.renderer.shadowMap.enabled = qualityConfig.shadows;
