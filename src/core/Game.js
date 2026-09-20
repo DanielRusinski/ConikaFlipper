@@ -247,6 +247,7 @@ export class Game {
         this.labelSystem = new LabelSystem();
         this.labelSystem.init(labelContainer, this.scene);
         this.findingSystem.setLabelSystem(this.labelSystem);
+        this.findingSystem.spawnBoardCrystals(this.tileManager);
 
         this.stageBriefing = new StageBriefing();
         this.stageBriefing.init(uiOverlay);
@@ -847,6 +848,7 @@ export class Game {
 
         // Full clean reset of crystals, labels, and particle trails
         this.findingSystem.reset();
+        this.findingSystem.spawnBoardCrystals(this.tileManager);
 
         // Full clean reset of laser hazard
         if (this.laserHazardSystem) {
@@ -1036,7 +1038,6 @@ export class Game {
         const newSeed = (Date.now() % 100000) + this.currentStage * 137;
         this.rebuildBoard({ randomSeed: newSeed });
 
-        this.findingSystem.reset();
         if (this.laserHazardSystem) {
             this.laserHazardSystem.reset();
         }
@@ -1186,6 +1187,11 @@ export class Game {
             tilesX: GAME_CONFIG.grid.tilesX,
             tilesY: GAME_CONFIG.grid.tilesY
         });
+
+        if (this.findingSystem) {
+            this.findingSystem.reset();
+            this.findingSystem.spawnBoardCrystals(this.tileManager);
+        }
     }
 
     _onResize() {

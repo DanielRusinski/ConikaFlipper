@@ -9,8 +9,7 @@ import { qualityManager } from '../core/QualityManager.js';
 const FilmGrainShader = {
     uniforms: {
         tDiffuse: { value: null },
-        time: { value: 0 },
-        intensity: { value: 0.08 }
+        intensity: { value: 0.04 }
     },
     vertexShader: `
         varying vec2 vUv;
@@ -21,7 +20,6 @@ const FilmGrainShader = {
     `,
     fragmentShader: `
         uniform sampler2D tDiffuse;
-        uniform float time;
         uniform float intensity;
         varying vec2 vUv;
         
@@ -31,7 +29,8 @@ const FilmGrainShader = {
 
         void main() {
             vec4 color = texture2D(tDiffuse, vUv);
-            float noise = (random(vUv * 600.0 + fract(time * 47.123) * 100.0) - 0.5) * intensity;
+            // Single static fixed noise frame - not animated per frame
+            float noise = (random(vUv * 750.0) - 0.5) * intensity;
             color.rgb += noise;
             gl_FragColor = color;
         }
@@ -62,10 +61,10 @@ export class PostProcessingManager {
         this.composer.addPass(this.renderPass);
 
         const resolution = new THREE.Vector2(window.innerWidth, window.innerHeight);
-        this.bloomPass = new UnrealBloomPass(resolution, 0.35, 1.0, 0.80);
-        this.bloomPass.strength = 0.35;
-        this.bloomPass.radius = 1.0;
-        this.bloomPass.threshold = 0.80;
+        this.bloomPass = new UnrealBloomPass(resolution, 0.20, 0.5, 0.84);
+        this.bloomPass.strength = 0.20;
+        this.bloomPass.radius = 0.5;
+        this.bloomPass.threshold = 0.84;
         this.composer.addPass(this.bloomPass);
 
         this.grainPass = new ShaderPass(FilmGrainShader);
@@ -90,9 +89,9 @@ export class PostProcessingManager {
         
         const grainIntensity = (qualityConfig.grainIntensity !== undefined && qualityConfig.grainIntensity > 0)
             ? qualityConfig.grainIntensity
-            : 0.06;
+            : 0.04;
         if (this.grainPass) {
-            this.grainPass.enabled = true;
+            this.grainPass.enabled = qualityConfig.grainIntensity !== 0;
             this.grainPass.uniforms.intensity.value = grainIntensity;
         }
         
@@ -100,9 +99,7 @@ export class PostProcessingManager {
     }
 
     updateTime(time) {
-        if (this.grainPass) {
-            this.grainPass.uniforms.time.value = (time * 0.001) % 1000.0;
-        }
+        // Static grain requested: keep single fixed frame (no per-frame animation)
     }
 
     setBloomStrength(strength) {
