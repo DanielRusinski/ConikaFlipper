@@ -269,6 +269,47 @@ export class TileManager {
         return this.visitedTiles.has(this.getTileIndex(gridX, gridY));
     }
 
+    /**
+     * Un-conquers / un-marks tiles within a blast radius (reverting to default silver).
+     * Used by bombs on explosion.
+     */
+    unconquerTilesInRadius(centerWorldX, centerWorldZ, radiusWorld) {
+        if (!this.instancedMesh) return [];
+        const defaultColor = new THREE.Color(TILE_COLORS.default);
+        const unvisited = [];
+        const radSq = radiusWorld * radiusWorld;
+
+        const { gridX: centerGX, gridY: centerGY } = this.getTileGridPosFromWorld(centerWorldX, centerWorldZ);
+        const cellRadiusX = Math.ceil(radiusWorld / this.tileWidth) + 1;
+        const cellRadiusY = Math.ceil(radiusWorld / this.tileHeight) + 1;
+
+        for (let gy = Math.max(0, centerGY - cellRadiusY); gy <= Math.min(this.tilesY - 1, centerGY + cellRadiusY); gy++) {
+            for (let gx = Math.max(0, centerGX - cellRadiusX); gx <= Math.min(this.tilesX - 1, centerGX + cellRadiusX); gx++) {
+                const index = this.getTileIndex(gx, gy);
+                if (this.isObstacle(gx, gy)) continue;
+
+                const pos = this.getTileWorldPos(gx, gy);
+                const dx = pos.x - centerWorldX;
+                const dz = pos.z - centerWorldZ;
+                if (dx * dx + dz * dz <= radSq) {
+                    if (this.visitedTiles.has(index)) {
+                        this.visitedTiles.delete(index);
+                        this.activeFlashes.delete(index);
+                        this.instancedMesh.setColorAt(index, defaultColor);
+                        unvisited.push({ index, gridX: gx, gridY: gy, x: pos.x, z: pos.z });
+                    }
+                }
+            }
+        }
+
+        if (unvisited.length > 0) {
+            this.instancedMesh.instanceColor.needsUpdate = true;
+            this.emitTilesChanged();
+            eventBus.emit('tiles:unconquered', { tiles: unvisited, count: unvisited.length });
+        }
+        return unvisited;
+    }
+
     getDiscoveredCount() {
         return this.visitedTiles.size;
     }

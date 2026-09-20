@@ -429,32 +429,10 @@ export class BombSystem {
         if (bomb.ringMesh && bomb.ringMesh.material) bomb.ringMesh.material.dispose();
         if (bomb.sphereMesh && bomb.sphereMesh.material) bomb.sphereMesh.material.dispose();
 
-        // 5. Uncover all playable tiles within 3 tiles radius!
-        // Manhattan or Euclidean distance: radius of 3 tiles
-        const radiusInTiles = 3;
-        const newlyConquered = [];
-
-        for (let dy = -radiusInTiles; dy <= radiusInTiles; dy++) {
-            for (let dx = -radiusInTiles; dx <= radiusInTiles; dx++) {
-                const distSq = dx * dx + dy * dy;
-                // Within 3-tile radius circle
-                if (distSq <= radiusInTiles * radiusInTiles + 0.25) {
-                    const tx = gridX + dx;
-                    const ty = gridY + dy;
-                    if (tx >= 0 && tx < this._tilesX && ty >= 0 && ty < this._tilesY) {
-                        if (this._tileManager && !this._tileManager.isObstacle(tx, ty)) {
-                            const wasNew = this._tileManager.conquerTile(tx, ty);
-                            if (wasNew) {
-                                newlyConquered.push({ tx, ty });
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (newlyConquered.length > 0) {
-            playSound(1250, 0.35); // Rewarding tile revelation fanfare
+        // 5. UN-MARK / UN-CONQUER all tiles within explosion blast radius!
+        // "upewnij sie ze bomby po wybuchu odznaczaja kafelki"
+        if (this._tileManager) {
+            this._tileManager.unconquerTilesInRadius(targetX, targetZ, blastRadius);
         }
 
         // 6. Check player ball proximity! If ball is within explosion radius -> instant destruction

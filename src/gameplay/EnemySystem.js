@@ -241,54 +241,99 @@ export class EnemySystem {
     }
 
     /**
+     * Finds the nearest non-obstacle tile if candidate center (cx, cy) falls on an obstacle.
+     */
+    _findNearestWalkableCenter(cx, cy) {
+        let bestCx = Math.max(1, Math.min(this._tilesX - 2, cx));
+        let bestCy = Math.max(1, Math.min(this._tilesY - 2, cy));
+
+        if (!this._tileManager || !this._tileManager.isObstacle(bestCx, bestCy)) {
+            return { cx: bestCx, cy: bestCy };
+        }
+
+        // Search outward in concentric rings for the closest non-obstacle tile
+        for (let r = 1; r <= 6; r++) {
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+                    const testCx = cx + dx;
+                    const testCy = cy + dy;
+                    if (testCx >= 1 && testCx <= this._tilesX - 2 && testCy >= 1 && testCy <= this._tilesY - 2) {
+                        if (!this._tileManager.isObstacle(testCx, testCy)) {
+                            return { cx: testCx, cy: testCy };
+                        }
+                    }
+                }
+            }
+        }
+        return { cx: bestCx, cy: bestCy };
+    }
+
+    /**
      * Resolves continuous obstacle barrier collisions for an enemy cylinder.
      * Prevents penetration and smoothly glides the cylinder along the barrier's exterior.
+     * Considers both pivot position and eccentric visual mesh radius.
      */
     _resolveObstacleCollisions(enemy) {
         if (!this._tileManager) return;
 
-        const gridPos = this._tileManager.getTileGridPosFromWorld(enemy.x, enemy.z);
-        const minAllowedDist = this._enemyRadius + 0.003; // Radius 0.0135 + buffer 0.003 = 0.0165m
+        // Visual group has eccentricity offset along spin angle
+        const eccX = Math.cos(enemy.spinAngle || 0) * (enemy.eccentricity || this._eccentricity);
+        const eccZ = -Math.sin(enemy.spinAngle || 0) * (enemy.eccentricity || this._eccentricity);
+
+        // Effective bounding radius covers the physical cylinder mesh plus eccentricity plus safe clearance
+        const effectiveRadius = this._enemyRadius + (enemy.eccentricity || this._eccentricity) + 0.0035; // ~0.020m
         const halfW = (this._tileWidth * 0.92) * 0.5;
         const halfH = (this._tileHeight * 0.92) * 0.5;
 
-        for (let dy = -1; dy <= 1; dy++) {
-            for (let dx = -1; dx <= 1; dx++) {
-                const gx = gridPos.gridX + dx;
-                const gy = gridPos.gridY + dy;
+        // Check 5x5 window around current grid position to catch all neighboring obstacle columns
+        const gridPos = this._tileManager.getTileGridPosFromWorld(enemy.x, enemy.z);
 
-                if (this._tileManager.isObstacle(gx, gy)) {
-                    const obsPos = this._tileManager.getTileWorldPos(gx, gy);
-                    const minX = obsPos.x - halfW;
-                    const maxX = obsPos.x + halfW;
-                    const minZ = obsPos.z - halfH;
-                    const maxZ = obsPos.z + halfH;
+        for (let iter = 0; iter < 2; iter++) { // 2 passes for rock-solid corner resolution
+            for (let dy = -2; dy <= 2; dy++) {
+                for (let dx = -2; dx <= 2; dx++) {
+                    const gx = gridPos.gridX + dx;
+                    const gy = gridPos.gridY + dy;
 
-                    const clampX = Math.max(minX, Math.min(enemy.x, maxX));
-                    const clampZ = Math.max(minZ, Math.min(enemy.z, maxZ));
+                    if (this._tileManager.isObstacle(gx, gy)) {
+                        const obsPos = this._tileManager.getTileWorldPos(gx, gy);
+                        const minX = obsPos.x - halfW;
+                        const maxX = obsPos.x + halfW;
+                        const minZ = obsPos.z - halfH;
+                        const maxZ = obsPos.z + halfH;
 
-                    const diffX = enemy.x - clampX;
-                    const diffZ = enemy.z - clampZ;
-                    const distSq = diffX * diffX + diffZ * diffZ;
+                        // Test against both the pivot position and the actual eccentric mesh center
+                        const actualX = enemy.x + eccX;
+                        const actualZ = enemy.z + eccZ;
 
-                    if (distSq < minAllowedDist * minAllowedDist) {
-                        if (distSq > 1e-7) {
-                            const dist = Math.sqrt(distSq);
-                            const pen = minAllowedDist - dist;
-                            enemy.x += (diffX / dist) * pen;
-                            enemy.z += (diffZ / dist) * pen;
-                        } else {
-                            // Enemy center is inside obstacle box: push out to closest face
-                            const dLeft = Math.abs(enemy.x - minX);
-                            const dRight = Math.abs(maxX - enemy.x);
-                            const dTop = Math.abs(enemy.z - minZ);
-                            const dBot = Math.abs(maxZ - enemy.z);
-                            const minD = Math.min(dLeft, dRight, dTop, dBot);
+                        const clampX = Math.max(minX, Math.min(actualX, maxX));
+                        const clampZ = Math.max(minZ, Math.min(actualZ, maxZ));
 
-                            if (minD === dLeft) enemy.x = minX - minAllowedDist;
-                            else if (minD === dRight) enemy.x = maxX + minAllowedDist;
-                            else if (minD === dTop) enemy.z = minZ - minAllowedDist;
-                            else enemy.z = maxZ + minAllowedDist;
+                        const diffX = actualX - clampX;
+                        const diffZ = actualZ - clampZ;
+                        const distSq = diffX * diffX + diffZ * diffZ;
+
+                        if (distSq < effectiveRadius * effectiveRadius) {
+                            if (distSq > 1e-7) {
+                                const dist = Math.sqrt(distSq);
+                                const pen = effectiveRadius - dist;
+                                const pushX = (diffX / dist) * pen;
+                                const pushZ = (diffZ / dist) * pen;
+                                enemy.x += pushX;
+                                enemy.z += pushZ;
+                            } else {
+                                // Cylinder center is completely inside obstacle box: push out to closest face
+                                const dLeft = Math.abs(actualX - minX);
+                                const dRight = Math.abs(maxX - actualX);
+                                const dTop = Math.abs(actualZ - minZ);
+                                const dBot = Math.abs(maxZ - actualZ);
+                                const minD = Math.min(dLeft, dRight, dTop, dBot);
+
+                                if (minD === dLeft) enemy.x = minX - eccX - effectiveRadius;
+                                else if (minD === dRight) enemy.x = maxX - eccX + effectiveRadius;
+                                else if (minD === dTop) enemy.z = minZ - eccZ - effectiveRadius;
+                                else enemy.z = maxZ - eccZ + effectiveRadius;
+                            }
                         }
                     }
                 }
@@ -297,15 +342,53 @@ export class EnemySystem {
     }
 
     _createEnemy(cx, cy, delaySeconds = 0) {
-        // Clamp center to valid bounds ensuring 3x3 perimeter fits on board
-        const clampedCx = Math.max(1, Math.min(this._tilesX - 2, cx));
-        const clampedCy = Math.max(1, Math.min(this._tilesY - 2, cy));
+        // Guarantee center is a valid walkable non-obstacle tile
+        const safeCenter = this._findNearestWalkableCenter(cx, cy);
+        const clampedCx = safeCenter.cx;
+        const clampedCy = safeCenter.cy;
 
         const waypoints = this._calcWaypoints(clampedCx, clampedCy);
         const centerPos = this._tileManager.getTileWorldPos(clampedCx, clampedCy);
         const orbitRadius = this._tileWidth * 1.15;
-        const initialAngle = Math.random() * Math.PI * 2;
-        // Position initial spawn smoothly along circular orbit
+
+        // Try 16 angles to pick the safest initial spawn location furthest away from obstacle columns
+        let bestAngle = Math.random() * Math.PI * 2;
+        let maxObstacleDist = -1;
+
+        if (this._tileManager) {
+            const halfW = (this._tileWidth * 0.92) * 0.5;
+            const halfH = (this._tileHeight * 0.92) * 0.5;
+
+            for (let a = 0; a < 16; a++) {
+                const angle = (a / 16) * Math.PI * 2;
+                const testX = centerPos.x + Math.cos(angle) * orbitRadius;
+                const testZ = centerPos.z + Math.sin(angle) * orbitRadius;
+                
+                let minDist = 999;
+                const gridPos = this._tileManager.getTileGridPosFromWorld(testX, testZ);
+
+                for (let dy = -2; dy <= 2; dy++) {
+                    for (let dx = -2; dx <= 2; dx++) {
+                        const gx = gridPos.gridX + dx;
+                        const gy = gridPos.gridY + dy;
+                        if (this._tileManager.isObstacle(gx, gy)) {
+                            const obsPos = this._tileManager.getTileWorldPos(gx, gy);
+                            const cX = Math.max(obsPos.x - halfW, Math.min(testX, obsPos.x + halfW));
+                            const cZ = Math.max(obsPos.z - halfH, Math.min(testZ, obsPos.z + halfH));
+                            const d = Math.hypot(testX - cX, testZ - cZ);
+                            if (d < minDist) minDist = d;
+                        }
+                    }
+                }
+
+                if (minDist > maxObstacleDist) {
+                    maxObstacleDist = minDist;
+                    bestAngle = angle;
+                }
+            }
+        }
+
+        const initialAngle = bestAngle;
         const spawnX = centerPos.x + Math.cos(initialAngle) * orbitRadius;
         const spawnZ = centerPos.z + Math.sin(initialAngle) * orbitRadius;
 
@@ -581,7 +664,7 @@ export class EnemySystem {
                     const targetCx = Math.max(1, Math.min(this._tilesX - 2, enemy.cx + stepX));
                     const targetCy = Math.max(1, Math.min(this._tilesY - 2, enemy.cy + stepY));
 
-                    if (targetCx !== enemy.cx || targetCy !== enemy.cy) {
+                    if (!this._tileManager.isObstacle(targetCx, targetCy) && (targetCx !== enemy.cx || targetCy !== enemy.cy)) {
                         const nextCenterPos = this._tileManager.getTileWorldPos(targetCx, targetCy);
                         enemy.isShifting = true;
                         enemy.targetCenterWorld = { x: nextCenterPos.x, z: nextCenterPos.z };
@@ -602,8 +685,8 @@ export class EnemySystem {
                 const gridPos = this._tileManager.getTileGridPosFromWorld(enemy.x, enemy.z);
                 const halfW = (this._tileWidth * 0.92) * 0.5;
                 const halfH = (this._tileHeight * 0.92) * 0.5;
-                const minColDist = this._enemyRadius + 0.003; // ~0.0165m
-                const avoidDist  = minColDist + 0.016;        // ~0.0325m
+                const minColDist = this._enemyRadius + (enemy.eccentricity || this._eccentricity) + 0.0035; // ~0.020m
+                const avoidDist  = minColDist + 0.018;
 
                 let steerX = 0;
                 let steerZ = 0;
@@ -660,9 +743,9 @@ export class EnemySystem {
                                     vz += nz * intoWall;
                                 }
 
-                                // Steer tangentially along wall face and gently repel outwards
-                                steerX += (nx * 1.3 + tx * 1.6) * (this._moveSpeed * pen);
-                                steerZ += (nz * 1.3 + tz * 1.6) * (this._moveSpeed * pen);
+                                // Steer tangentially along wall face and firmly repel outwards
+                                steerX += (nx * 1.8 + tx * 1.6) * (this._moveSpeed * pen);
+                                steerZ += (nz * 1.8 + tz * 1.6) * (this._moveSpeed * pen);
                             }
                         }
                     }
@@ -953,16 +1036,16 @@ export class EnemySystem {
         const dx = playerGx - enemy.cx;
         const dy = playerGy - enemy.cy;
 
-        // Obstacle cost function for candidate center
+        // Obstacle cost function for candidate center: STRICT IMPASSABLE FOR OBSTACLES!
         const getObstacleCost = (cx, cy) => {
-            if (cx < 1 || cx > this._tilesX - 2 || cy < 1 || cy > this._tilesY - 2) return 999;
+            if (cx < 1 || cx > this._tilesX - 2 || cy < 1 || cy > this._tilesY - 2) return 99999;
+            if (this._tileManager.isObstacle(cx, cy)) return 99999; // NEVER step into an obstacle column!
             let cost = 0;
-            if (this._tileManager.isObstacle(cx, cy)) cost += 4;
-            // Count obstacles in 3x3 perimeter
+            // Count obstacles in 3x3 perimeter surrounding the center
             for (let ox = -1; ox <= 1; ox++) {
                 for (let oy = -1; oy <= 1; oy++) {
                     if (this._tileManager.isObstacle(cx + ox, cy + oy)) {
-                        cost += 1;
+                        cost += 2;
                     }
                 }
             }
@@ -978,25 +1061,49 @@ export class EnemySystem {
 
         const cost1 = (cand1.stepX !== 0 || cand1.stepY !== 0) 
             ? getObstacleCost(enemy.cx + cand1.stepX, enemy.cy + cand1.stepY) 
-            : 999;
+            : 99999;
         const cost2 = (cand2.stepX !== 0 || cand2.stepY !== 0) 
             ? getObstacleCost(enemy.cx + cand2.stepX, enemy.cy + cand2.stepY) 
-            : 999;
+            : 99999;
 
         let stepX = 0;
         let stepY = 0;
 
-        // Choose the path that avoids barriers
-        if (cost1 <= 3) {
+        // Choose the path that strictly avoids obstacles
+        if (cost1 < 1000 && cost1 <= cost2) {
             stepX = cand1.stepX;
             stepY = cand1.stepY;
-        } else if (cost2 < cost1) {
-            // Barrier blocks primary axis! Bypass obstacle via secondary axis
+        } else if (cost2 < 1000) {
             stepX = cand2.stepX;
             stepY = cand2.stepY;
-        } else if (cost1 < 999) {
-            stepX = cand1.stepX;
-            stepY = cand1.stepY;
+        } else {
+            // Both primary candidates blocked by obstacles: try all 4 cardinal steps
+            const allCandidates = [
+                { stepX: 1, stepY: 0 },
+                { stepX: -1, stepY: 0 },
+                { stepX: 0, stepY: 1 },
+                { stepX: 0, stepY: -1 }
+            ];
+            let bestAltDist = 99999;
+            for (const cand of allCandidates) {
+                const nCx = enemy.cx + cand.stepX;
+                const nCy = enemy.cy + cand.stepY;
+                const c = getObstacleCost(nCx, nCy);
+                if (c < 1000) {
+                    const distToPlayer = Math.hypot(playerGx - nCx, playerGy - nCy);
+                    if (distToPlayer < bestAltDist) {
+                        bestAltDist = distToPlayer;
+                        stepX = cand.stepX;
+                        stepY = cand.stepY;
+                    }
+                }
+            }
+        }
+
+        // Safeguard: never accept a step that lands on an obstacle!
+        if (this._tileManager.isObstacle(enemy.cx + stepX, enemy.cy + stepY)) {
+            stepX = 0;
+            stepY = 0;
         }
 
         enemy.pendingStep = { stepX, stepY };
@@ -1012,18 +1119,20 @@ export class EnemySystem {
             : { x: 0, z: 0 };
 
         for (const quad of this._spawnQuadrants) {
-            const worldPos = this._tileManager.getTileWorldPos(quad.cx, quad.cy);
+            const safeQuad = this._findNearestWalkableCenter(quad.cx, quad.cy);
+            const worldPos = this._tileManager.getTileWorldPos(safeQuad.cx, safeQuad.cy);
             const dist = Math.hypot(worldPos.x - playerPos.x, worldPos.z - playerPos.z);
 
             // Avoid spawning on top of existing active enemies
-            const occupied = this._enemies.some(e => Math.hypot(e.cx - quad.cx, e.cy - quad.cy) < 3);
+            const occupied = this._enemies.some(e => Math.hypot(e.cx - safeQuad.cx, e.cy - safeQuad.cy) < 3);
             if (!occupied && dist > maxDist) {
                 maxDist = dist;
-                bestQuad = quad;
+                bestQuad = safeQuad;
             }
         }
 
-        this._createEnemy(bestQuad.cx, bestQuad.cy);
+        const chosenCenter = this._findNearestWalkableCenter(bestQuad.cx, bestQuad.cy);
+        this._createEnemy(chosenCenter.cx, chosenCenter.cy);
     }
 
     _onBombDetonated(bombX, bombZ, radius) {

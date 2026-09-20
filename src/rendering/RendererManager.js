@@ -39,7 +39,9 @@ export class RendererManager {
         
         const defaultPreset = LIGHTING_CONFIG.presets[LIGHTING_CONFIG.defaultPreset];
         if (defaultPreset && defaultPreset.background) {
-            this.renderer.setClearColor(new THREE.Color(defaultPreset.background));
+            const bgCol = new THREE.Color(defaultPreset.background);
+            this.renderer.setClearColor(bgCol);
+            this.scene.background = bgCol;
         }
         
         const initialLevel = GRAPHICS_CONFIG.isMobile ? 'medium' : 'high';

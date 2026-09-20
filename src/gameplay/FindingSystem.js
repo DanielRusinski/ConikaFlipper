@@ -21,8 +21,10 @@ export class FindingSystem {
 
     this._dummy = new THREE.Object3D();
     this.instancedMesh = null;
+    this._ghostInstancedMesh = null;
     this._octaGeometry = null;
     this._material = null;
+    this._ghostMaterial = null;
 
     // Pre-allocated colors for instanced rendering
     this._colorCard = new THREE.Color(0xff00cc);    // Neon Magenta
@@ -42,7 +44,7 @@ export class FindingSystem {
     // Diamond / gem octahedron geometry shared across all 15 crystal instances
     this._octaGeometry = new THREE.OctahedronGeometry(1, 0);
 
-    // Glowing crystal material with specular shine for Bloom and vibrant lighting
+    // Glowing solid crystal material with specular shine for Bloom and vibrant lighting
     this._material = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       roughness: 0.15,
@@ -52,15 +54,37 @@ export class FindingSystem {
       emissiveIntensity: 0.8
     });
 
-    // Single InstancedMesh for ALL crystals (draws all 15 crystals in a single draw call!)
+    // Ghost / transparent crystal material for when crystal is discovered and bouncing
+    this._ghostMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.15,
+      metalness: 0.10,
+      transparent: true,
+      opacity: 0.38,
+      emissive: 0x444444,
+      emissiveIntensity: 0.4
+    });
+
+    // InstancedMesh for solid ready crystals
     this.instancedMesh = new THREE.InstancedMesh(this._octaGeometry, this._material, this.TOTAL_CRYSTALS);
     this.instancedMesh.name = 'FindingSystemInstancedMesh';
-    this.instancedMesh.castShadow = false; // Disabled for mobile performance
+    this.instancedMesh.castShadow = false;
     this.instancedMesh.receiveShadow = false;
     this.instancedMesh.frustumCulled = false;
     this.instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     if (this.instancedMesh.instanceColor) {
       this.instancedMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+    }
+
+    // InstancedMesh for transparent ghost bouncing crystals
+    this._ghostInstancedMesh = new THREE.InstancedMesh(this._octaGeometry, this._ghostMaterial, this.TOTAL_CRYSTALS);
+    this._ghostInstancedMesh.name = 'FindingSystemGhostInstancedMesh';
+    this._ghostInstancedMesh.castShadow = false;
+    this._ghostInstancedMesh.receiveShadow = false;
+    this._ghostInstancedMesh.frustumCulled = false;
+    this._ghostInstancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    if (this._ghostInstancedMesh.instanceColor) {
+      this._ghostInstancedMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
     }
 
     // Pre-allocate 15 slots and anchor dummy objects for CSS2D labels
@@ -75,6 +99,8 @@ export class FindingSystem {
         index: i,
         active: false,
         revealed: false,
+        state: 'hidden', // 'hidden' -> 'ghost_bouncing' -> 'solid_ready' -> 'collected'
+        timer: 0,
         animatingSpawn: false,
         spawnProgress: 0,
         id: i,
@@ -101,19 +127,26 @@ export class FindingSystem {
         value: 250
       });
 
-      // Initially scale to 0 far below table
+      // Initially scale to 0 far below table for both meshes
       this._dummy.position.set(0, -999, 0);
       this._dummy.scale.set(0, 0, 0);
       this._dummy.updateMatrix();
       this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
       this.instancedMesh.setColorAt(i, this._colorPoints);
+      this._ghostInstancedMesh.setMatrixAt(i, this._dummy.matrix);
+      this._ghostInstancedMesh.setColorAt(i, this._colorPoints);
     }
 
     this.instancedMesh.instanceMatrix.needsUpdate = true;
     if (this.instancedMesh.instanceColor) {
       this.instancedMesh.instanceColor.needsUpdate = true;
     }
+    this._ghostInstancedMesh.instanceMatrix.needsUpdate = true;
+    if (this._ghostInstancedMesh.instanceColor) {
+      this._ghostInstancedMesh.instanceColor.needsUpdate = true;
+    }
 
+    this._group.add(this._ghostInstancedMesh);
     this._group.add(this.instancedMesh);
     this._unsub = eventBus.on('tile:discovered', this._onTileDiscovered.bind(this));
   }
@@ -206,6 +239,8 @@ export class FindingSystem {
 
       slot.active = false;
       slot.revealed = false;
+      slot.state = 'hidden';
+      slot.timer = 0;
       slot.animatingSpawn = false;
       slot.spawnProgress = 0;
       slot.id = this._nextId++;
@@ -235,17 +270,29 @@ export class FindingSystem {
       slot.anchorObject.visible = false;
 
       this.instancedMesh.setColorAt(i, spec.color);
+      if (this._ghostInstancedMesh) {
+        this._ghostInstancedMesh.setColorAt(i, spec.color);
+      }
 
       this._dummy.position.set(0, -999, 0);
       this._dummy.rotation.set(0, 0, 0);
       this._dummy.scale.set(0, 0, 0);
       this._dummy.updateMatrix();
       this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
+      if (this._ghostInstancedMesh) {
+        this._ghostInstancedMesh.setMatrixAt(i, this._dummy.matrix);
+      }
     }
 
     this.instancedMesh.instanceMatrix.needsUpdate = true;
     if (this.instancedMesh.instanceColor) {
       this.instancedMesh.instanceColor.needsUpdate = true;
+    }
+    if (this._ghostInstancedMesh) {
+      this._ghostInstancedMesh.instanceMatrix.needsUpdate = true;
+      if (this._ghostInstancedMesh.instanceColor) {
+        this._ghostInstancedMesh.instanceColor.needsUpdate = true;
+      }
     }
   }
 
@@ -280,12 +327,12 @@ export class FindingSystem {
     const slot = this._slots.find(s => !s.revealed);
     if (!slot) return;
 
-    // UNCOVER / REVEAL THIS CRYSTAL AT CONQUERED TILE COORDINATES!
+    // UNCOVER / REVEAL THIS CRYSTAL AS A TRANSPARENT BOUNCING GHOST!
     this._uncoveredCount++;
     slot.revealed = true;
     slot.active = true;
-    slot.animatingSpawn = true;
-    slot.spawnProgress = 0;
+    slot.state = 'ghost_bouncing';
+    slot.timer = 0;
     slot.tileIndex = tileIndex;
     slot.gridX = (gridX !== undefined) ? gridX : 0;
     slot.gridY = (gridY !== undefined) ? gridY : 0;
@@ -293,26 +340,35 @@ export class FindingSystem {
     slot.baseZ = z;
     slot.currentScale = 0.001;
 
-    // Position and show anchor object for CSS2D label
+    // Position anchor object, but label is hidden until crystal becomes solid and ready
     slot.anchorObject.position.set(x, slot.baseY, z);
-    slot.anchorObject.visible = true;
+    slot.anchorObject.visible = false;
+    slot.labelId = null;
 
-    if (this._labelSystem && slot.labelId === null) {
-      slot.labelId = this._labelSystem.createLabel(slot.anchorObject, {
-        text: slot.labelText,
-        className: slot.labelClass,
-        worldOffset: { x: 0, y: 0.038, z: 0 }
-      });
+    // Set colors on both meshes
+    this.instancedMesh.setColorAt(slot.index, slot.color);
+    if (this._ghostInstancedMesh) {
+      this._ghostInstancedMesh.setColorAt(slot.index, slot.color);
     }
 
-    // Update instance color & initial position
-    this.instancedMesh.setColorAt(slot.index, slot.color);
+    // Ghost mesh placed at conquered tile coordinates
     this._dummy.position.set(x, slot.baseY, z);
     this._dummy.rotation.set(0, slot.rotationY, 0);
     this._dummy.scale.set(0.001, 0.001, 0.001);
     this._dummy.updateMatrix();
-    this.instancedMesh.setMatrixAt(slot.index, this._dummy.matrix);
+    if (this._ghostInstancedMesh) {
+      this._ghostInstancedMesh.setMatrixAt(slot.index, this._dummy.matrix);
+      this._ghostInstancedMesh.instanceMatrix.needsUpdate = true;
+      if (this._ghostInstancedMesh.instanceColor) {
+        this._ghostInstancedMesh.instanceColor.needsUpdate = true;
+      }
+    }
 
+    // Solid mesh remains hidden initially
+    this._dummy.position.set(0, -999, 0);
+    this._dummy.scale.set(0, 0, 0);
+    this._dummy.updateMatrix();
+    this.instancedMesh.setMatrixAt(slot.index, this._dummy.matrix);
     this.instancedMesh.instanceMatrix.needsUpdate = true;
     if (this.instancedMesh.instanceColor) {
       this.instancedMesh.instanceColor.needsUpdate = true;
@@ -330,19 +386,13 @@ export class FindingSystem {
       mesh: {
         position: slot.anchorObject.position,
         visible: true,
-        userData: { state: 'ready', bloomReady: true }
+        userData: { state: 'ghost_bouncing', bloomReady: true }
       }
     };
     this._findings.set(slot.id, findingData);
 
-    // Juicy audio cue for uncovering a hidden crystal
-    if (slot.type === 'modifier') {
-      playSound(1200, 0.28);
-    } else if (slot.type === 'emerald_crystal') {
-      playSound(1000, 0.22);
-    } else {
-      playSound(820, 0.18);
-    }
+    // Subtle gentle pop sound for uncovering a hidden crystal
+    playSound(720, 0.16);
 
     eventBus.emit('crystal:revealed', {
       slotIndex: slot.index,
@@ -447,50 +497,120 @@ export class FindingSystem {
 
     for (let i = 0; i < this.TOTAL_CRYSTALS; i++) {
       const slot = this._slots[i];
-      if (!slot.active || !slot.revealed) {
+      if (!slot.active || !slot.revealed || slot.state === 'collected' || slot.state === 'hidden') {
         this._dummy.position.set(0, -999, 0);
         this._dummy.scale.set(0, 0, 0);
         this._dummy.updateMatrix();
         this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
+        if (this._ghostInstancedMesh) {
+          this._ghostInstancedMesh.setMatrixAt(i, this._dummy.matrix);
+        }
         continue;
       }
 
-      // Smooth pop-up expansion animation on initial discovery
-      if (slot.animatingSpawn) {
-        slot.spawnProgress = Math.min(1.0, slot.spawnProgress + gameplayDelta * 4.5);
-        // Elastic overshoot easing for juicy gem pop
-        const p = slot.spawnProgress;
-        const overshoot = 1.30;
-        const eased = (p < 0.7)
-          ? (p / 0.7) * overshoot
-          : overshoot - ((p - 0.7) / 0.3) * (overshoot - 1.0);
-        slot.currentScale = slot.targetScale * Math.max(0.01, eased);
-
-        if (slot.spawnProgress >= 1.0) {
-          slot.animatingSpawn = false;
-          slot.currentScale = slot.targetScale;
-        }
-      } else {
-        slot.currentScale = slot.targetScale;
-      }
-
-      // Continuous rotation
+      // Continuous axial rotation
       slot.rotationY += slot.rotationSpeed * gameplayDelta;
       slot.rotationX += slot.rotationSpeed * 0.40 * gameplayDelta;
 
-      // Floating & Bobbing
-      slot.currentY = slot.baseY + Math.sin(elapsed * 2.2 + slot.timeOffset) * slot.amplitude;
-      slot.anchorObject.position.y = slot.currentY;
+      if (slot.state === 'ghost_bouncing') {
+        slot.timer += gameplayDelta;
+        const totalBounceDuration = 0.85;
 
-      // Update transform in InstancedMesh
-      this._dummy.position.set(slot.baseX, slot.currentY, slot.baseZ);
-      this._dummy.rotation.set(slot.rotationX, slot.rotationY, 0);
-      this._dummy.scale.set(slot.currentScale, slot.currentScale, slot.currentScale);
-      this._dummy.updateMatrix();
-      this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
+        if (slot.timer < totalBounceDuration) {
+          // Phase 1: Bouncing transparent crystal (2-3 quick damped bounces above tile)
+          const p = slot.timer / totalBounceDuration;
+          const bounceH = 0.024 * Math.abs(Math.sin(p * Math.PI * 3.5)) * (1.0 - p * 0.6);
+          slot.currentY = slot.baseY + bounceH;
+          slot.currentScale = slot.targetScale * Math.min(1.0, p * 3.0);
+
+          // Update ghost mesh transform
+          this._dummy.position.set(slot.baseX, slot.currentY, slot.baseZ);
+          this._dummy.rotation.set(slot.rotationX, slot.rotationY, 0);
+          this._dummy.scale.set(slot.currentScale, slot.currentScale, slot.currentScale);
+          this._dummy.updateMatrix();
+          if (this._ghostInstancedMesh) {
+            this._ghostInstancedMesh.setMatrixAt(i, this._dummy.matrix);
+          }
+
+          // Solid mesh stays hidden
+          this._dummy.position.set(0, -999, 0);
+          this._dummy.scale.set(0, 0, 0);
+          this._dummy.updateMatrix();
+          this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
+
+        } else if (slot.timer < totalBounceDuration + 1.0) {
+          // Phase 2: Rests transparent for 1.0s before filling with color
+          slot.currentY = slot.baseY + Math.sin(elapsed * 2.2 + slot.timeOffset) * slot.amplitude;
+          slot.currentScale = slot.targetScale;
+
+          this._dummy.position.set(slot.baseX, slot.currentY, slot.baseZ);
+          this._dummy.rotation.set(slot.rotationX, slot.rotationY, 0);
+          this._dummy.scale.set(slot.currentScale, slot.currentScale, slot.currentScale);
+          this._dummy.updateMatrix();
+          if (this._ghostInstancedMesh) {
+            this._ghostInstancedMesh.setMatrixAt(i, this._dummy.matrix);
+          }
+
+          this._dummy.position.set(0, -999, 0);
+          this._dummy.scale.set(0, 0, 0);
+          this._dummy.updateMatrix();
+          this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
+
+        } else {
+          // Phase 3: Fills with full solid glowing color!
+          slot.state = 'solid_ready';
+          slot.currentScale = slot.targetScale;
+          slot.anchorObject.visible = true;
+
+          // Create CSS2D reward label now that crystal is ready for pickup
+          if (this._labelSystem && slot.labelId === null) {
+            slot.labelId = this._labelSystem.createLabel(slot.anchorObject, {
+              text: slot.labelText,
+              className: slot.labelClass,
+              worldOffset: { x: 0, y: 0.038, z: 0 }
+            });
+          }
+
+          // Rewarding chime when crystal is fully energized and ready for pickup
+          if (slot.type === 'modifier') {
+            playSound(1250, 0.25);
+          } else if (slot.type === 'emerald_crystal') {
+            playSound(1100, 0.22);
+          } else {
+            playSound(960, 0.20);
+          }
+
+          const f = this._findings.get(slot.id);
+          if (f && f.mesh && f.mesh.userData) {
+            f.mesh.userData.state = 'ready';
+          }
+        }
+      } else if (slot.state === 'solid_ready') {
+        // Floating & Bobbing in full solid color
+        slot.currentY = slot.baseY + Math.sin(elapsed * 2.2 + slot.timeOffset) * slot.amplitude;
+        slot.anchorObject.position.y = slot.currentY;
+
+        // Ghost mesh hidden
+        this._dummy.position.set(0, -999, 0);
+        this._dummy.scale.set(0, 0, 0);
+        this._dummy.updateMatrix();
+        if (this._ghostInstancedMesh) {
+          this._ghostInstancedMesh.setMatrixAt(i, this._dummy.matrix);
+        }
+
+        // Solid mesh visible at full size
+        this._dummy.position.set(slot.baseX, slot.currentY, slot.baseZ);
+        this._dummy.rotation.set(slot.rotationX, slot.rotationY, 0);
+        this._dummy.scale.set(slot.targetScale, slot.targetScale, slot.targetScale);
+        this._dummy.updateMatrix();
+        this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
+      }
     }
 
     this.instancedMesh.instanceMatrix.needsUpdate = true;
+    if (this._ghostInstancedMesh) {
+      this._ghostInstancedMesh.instanceMatrix.needsUpdate = true;
+    }
   }
 
   checkCollection(ballX, ballZ, ballRadius) {
@@ -505,8 +625,9 @@ export class FindingSystem {
 
     for (let i = 0; i < this.TOTAL_CRYSTALS; i++) {
       const slot = this._slots[i];
-      // Only revealed and active crystals can be collected!
-      if (!slot.active || !slot.revealed) continue;
+      // CRITICAL: Crystals can ONLY be collected when they have fully charged to solid_ready!
+      // While bouncing and resting transparent, they cannot be picked up.
+      if (!slot.active || !slot.revealed || slot.state !== 'solid_ready') continue;
 
       const dx = slot.baseX - bx;
       const dz = slot.baseZ - bz;
@@ -516,7 +637,7 @@ export class FindingSystem {
 
       if (distSq < collectRadius * collectRadius) {
         slot.active = false;
-        slot.revealed = true; // Mark as uncovered & collected
+        slot.state = 'collected';
         slot.anchorObject.visible = false;
 
         if (slot.labelId !== null && this._labelSystem) {
@@ -524,12 +645,16 @@ export class FindingSystem {
           slot.labelId = null;
         }
 
-        // Instantly hide collected instance
+        // Instantly hide both meshes
         this._dummy.position.set(0, -999, 0);
         this._dummy.scale.set(0, 0, 0);
         this._dummy.updateMatrix();
         this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
         this.instancedMesh.instanceMatrix.needsUpdate = true;
+        if (this._ghostInstancedMesh) {
+          this._ghostInstancedMesh.setMatrixAt(i, this._dummy.matrix);
+          this._ghostInstancedMesh.instanceMatrix.needsUpdate = true;
+        }
 
         if (slot.type === 'points_crystal') {
           eventBus.emit('finding:collected', {
@@ -575,6 +700,8 @@ export class FindingSystem {
       if (slot) {
         slot.active = false;
         slot.revealed = false;
+        slot.state = 'hidden';
+        slot.timer = 0;
         slot.animatingSpawn = false;
         slot.spawnProgress = 0;
         slot.currentScale = 0;
@@ -584,16 +711,22 @@ export class FindingSystem {
           slot.labelId = null;
         }
       }
+      this._dummy.position.set(0, -999, 0);
+      this._dummy.scale.set(0, 0, 0);
+      this._dummy.updateMatrix();
       if (this.instancedMesh) {
-        this._dummy.position.set(0, -999, 0);
-        this._dummy.scale.set(0, 0, 0);
-        this._dummy.updateMatrix();
         this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
+      }
+      if (this._ghostInstancedMesh) {
+        this._ghostInstancedMesh.setMatrixAt(i, this._dummy.matrix);
       }
     }
 
     if (this.instancedMesh) {
       this.instancedMesh.instanceMatrix.needsUpdate = true;
+    }
+    if (this._ghostInstancedMesh) {
+      this._ghostInstancedMesh.instanceMatrix.needsUpdate = true;
     }
   }
 
@@ -615,6 +748,11 @@ export class FindingSystem {
       this._material = null;
     }
 
+    if (this._ghostMaterial) {
+      this._ghostMaterial.dispose();
+      this._ghostMaterial = null;
+    }
+
     if (this.instancedMesh) {
       this._group.remove(this.instancedMesh);
       this.instancedMesh.geometry.dispose();
@@ -622,6 +760,15 @@ export class FindingSystem {
         this.instancedMesh.material.dispose();
       }
       this.instancedMesh = null;
+    }
+
+    if (this._ghostInstancedMesh) {
+      this._group.remove(this._ghostInstancedMesh);
+      this._ghostInstancedMesh.geometry.dispose();
+      if (this._ghostInstancedMesh.material && this._ghostInstancedMesh.material.dispose) {
+        this._ghostInstancedMesh.material.dispose();
+      }
+      this._ghostInstancedMesh = null;
     }
 
     for (const slot of this._slots) {

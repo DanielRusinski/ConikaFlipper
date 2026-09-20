@@ -23,7 +23,8 @@ export class TransitionManager {
         this._renderTargetA = new THREE.WebGLRenderTarget(size.width * pixelRatio, size.height * pixelRatio, {
             minFilter: THREE.LinearFilter,
             magFilter: THREE.LinearFilter,
-            format: THREE.RGBAFormat
+            format: THREE.RGBAFormat,
+            colorSpace: THREE.SRGBColorSpace
         });
         this._renderTargetB = this._renderTargetA.clone();
         
@@ -197,6 +198,42 @@ export class TransitionManager {
         this._renderer.setRenderTarget(null);
     }
 
+    captureTargetB(renderFn) {
+        if (!this._renderer || !this._renderTargetB) return;
+        this._renderer.setRenderTarget(this._renderTargetB);
+        this._renderer.clear();
+        if (renderFn) renderFn();
+        this._renderer.setRenderTarget(null);
+    }
+
+    getTransitionScene() {
+        return this._transitionScene;
+    }
+
+    getTransitionCamera() {
+        return this._transitionCamera;
+    }
+
+    updateTargets(renderer) {
+        if (!this._transitioning) return;
+        
+        if (this.onRenderA) {
+            renderer.setRenderTarget(this._renderTargetA);
+            renderer.clear();
+            this.onRenderA();
+        }
+        if (this.onRenderB) {
+            renderer.setRenderTarget(this._renderTargetB);
+            renderer.clear();
+            this.onRenderB();
+        }
+        
+        renderer.setRenderTarget(null);
+        this._transitionMaterial.uniforms.tDiffuse1.value = this._renderTargetA.texture;
+        this._transitionMaterial.uniforms.tDiffuse2.value = this._renderTargetB.texture;
+        this._transitionMaterial.uniforms.mixRatio.value = this._progress;
+    }
+
     transitionTo(targetState, options = {}) {
         const { duration = 1000, onRenderA, onRenderB, onComplete } = options;
         const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -239,23 +276,7 @@ export class TransitionManager {
     }
     render(renderer) {
         if (!this._transitioning) return;
-        
-        if (this.onRenderA) {
-            renderer.setRenderTarget(this._renderTargetA);
-            renderer.clear();
-            this.onRenderA();
-        }
-        if (this.onRenderB) {
-            renderer.setRenderTarget(this._renderTargetB);
-            renderer.clear();
-            this.onRenderB();
-        }
-        
-        renderer.setRenderTarget(null);
-        this._transitionMaterial.uniforms.tDiffuse1.value = this._renderTargetA.texture;
-        this._transitionMaterial.uniforms.tDiffuse2.value = this._renderTargetB.texture;
-        this._transitionMaterial.uniforms.mixRatio.value = this._progress;
-        
+        this.updateTargets(renderer);
         renderer.render(this._transitionScene, this._transitionCamera);
     }
     resize(width, height, pixelRatio) {

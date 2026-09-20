@@ -158,6 +158,28 @@ export class PostProcessingManager {
         }
     }
 
+    renderTransition(transitionScene, transitionCamera) {
+        if (this.enabled && this.composer && this.renderPass) {
+            const oldScene = this.renderPass.scene;
+            const oldCamera = this.renderPass.camera;
+            this.renderPass.scene = transitionScene;
+            this.renderPass.camera = transitionCamera;
+            try {
+                this.composer.render();
+            } catch (err) {
+                console.error('Composer transition render failed, fallback:', err);
+                if (this.renderer) {
+                    this.renderer.render(transitionScene, transitionCamera);
+                }
+            } finally {
+                this.renderPass.scene = oldScene;
+                this.renderPass.camera = oldCamera;
+            }
+        } else if (this.renderer) {
+            this.renderer.render(transitionScene, transitionCamera);
+        }
+    }
+
     resize(width, height, pixelRatio) {
         if (this.composer) {
             this.composer.setSize(width, height);

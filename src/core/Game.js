@@ -855,7 +855,11 @@ export class Game {
         }
 
         if (this.transitionManager.isTransitioning()) {
-            this.transitionManager.render(this.renderer);
+            this.transitionManager.updateTargets(this.renderer);
+            this.postProcessing.renderTransition(
+                this.transitionManager.getTransitionScene(),
+                this.transitionManager.getTransitionCamera()
+            );
         } else {
             this.postProcessing.updateTime(timestamp);
             this.postProcessing.render();
@@ -945,6 +949,15 @@ export class Game {
         }
 
         const remainingLives = this.ballLifeSystem.loseLife();
+
+        // Player loses ball: reset active bombs and dismiss dragon companion immediately
+        if (this.bombSystem) {
+            this.bombSystem.reset();
+        }
+        if (this.dragonSystem) {
+            this.dragonSystem.reset();
+        }
+
         if (remainingLives <= 0) {
             this.gameOver('laser');
         } else {
@@ -960,6 +973,14 @@ export class Game {
     respawnEntryPhase() {
         this.screenManager.hideAll();
         this.gameHUD.show();
+
+        // Ensure bombs and dragon companion are reset on respawn
+        if (this.bombSystem) {
+            this.bombSystem.reset();
+        }
+        if (this.dragonSystem) {
+            this.dragonSystem.reset();
+        }
 
         // Show stage briefing banner during tile selection
         if (this.stageBriefing) {
@@ -1064,12 +1085,17 @@ export class Game {
     nextStage() {
         this.screenManager.hideAll();
 
-        // 1. Capture current finished board into RenderTargetA
+        // 1. Ensure shadow and lighting systems are updated before beauty capture of Target A
+        if (this.shadowSystem) {
+            this.shadowSystem.update(this.renderer);
+        }
+
+        // 2. Capture current finished board into RenderTargetA
         this.transitionManager.captureTargetA(() => {
             this.renderer.render(this.scene, this.camera);
         });
 
-        // 2. Advance stage and generate fresh board with new seed in background
+        // 3. Advance stage and generate fresh board with new seed in background
         this.currentStage++;
         const newSeed = (Date.now() % 100000) + this.currentStage * 137;
         this.rebuildBoard({ randomSeed: newSeed });
@@ -1094,7 +1120,15 @@ export class Game {
         this._gameTimer = GAME_CONFIG.timer.startingSeconds;
         this._gameOverTriggered = false;
 
-        // 3. Set transition state and animate dissolve via TransitionNode shader
+        // 4. Update shadow system and capture fresh new board into RenderTargetB
+        if (this.shadowSystem) {
+            this.shadowSystem.update(this.renderer);
+        }
+        this.transitionManager.captureTargetB(() => {
+            this.renderer.render(this.scene, this.camera);
+        });
+
+        // 5. Set transition state and animate dissolve via TransitionNode shader
         gameStateManager.setState(GAME_STATES.TRANSITION);
 
         this.transitionManager.transitionTo(GAME_STATES.SELECTION, {

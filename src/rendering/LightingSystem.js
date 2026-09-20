@@ -76,6 +76,14 @@ export class LightingSystem {
         if (this.scene.fog && preset.fog) {
             this.scene.fog.color.set(preset.fog.color);
         }
+
+        if (this.scene && preset.background !== undefined) {
+            if (!this.scene.background) {
+                this.scene.background = new THREE.Color(preset.background);
+            } else {
+                this.scene.background.set(preset.background);
+            }
+        }
         
         eventBus.emit('lighting:presetChanged', { presetName, preset });
     }
