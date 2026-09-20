@@ -10,11 +10,12 @@ export class FindingSystem {
     this._group = new THREE.Group();
     this._group.name = 'FindingSystemGroup';
 
-    // Total number of all crystal types combined (hidden, active, and collected total): exactly 15
+    // Total number of all crystal types combined (hidden, active, and collected total): strictly 15
     this.TOTAL_CRYSTALS = 15;
     this._slots = [];
     this._nextId = 0;
     this._tilesDiscoveredCount = 0;
+    this._uncoveredCount = 0;
     this._totalModifiersSpawned = 0;
     this._maxModifiersForBoard = 3;
 
@@ -41,27 +42,15 @@ export class FindingSystem {
     // Diamond / gem octahedron geometry shared across all 15 crystal instances
     this._octaGeometry = new THREE.OctahedronGeometry(1, 0);
 
-    // Glowing crystal material with vertexColors enabled so Three.js natively passes vColor
+    // Glowing crystal material with specular shine for Bloom and vibrant lighting
     this._material = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       roughness: 0.15,
-      metalness: 0.25,
-      transparent: true,
-      opacity: 0.95,
-      vertexColors: true
+      metalness: 0.20,
+      transparent: false,
+      emissive: 0x333333,
+      emissiveIntensity: 0.8
     });
-
-    this._material.onBeforeCompile = (shader) => {
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <emissivemap_fragment>',
-        `
-        #include <emissivemap_fragment>
-        #if defined( USE_COLOR )
-          totalEmissiveRadiance += vColor.rgb * 2.5;
-        #endif
-        `
-      );
-    };
 
     // Single InstancedMesh for ALL crystals (draws all 15 crystals in a single draw call!)
     this.instancedMesh = new THREE.InstancedMesh(this._octaGeometry, this._material, this.TOTAL_CRYSTALS);
@@ -95,9 +84,9 @@ export class FindingSystem {
         gridY: 0,
         baseX: 0,
         baseZ: 0,
-        baseY: 0.042,
-        currentY: 0.042,
-        targetScale: 0.016,
+        baseY: 0.034,
+        currentY: 0.034,
+        targetScale: 0.018,
         currentScale: 0,
         rotationX: 0,
         rotationY: 0,
@@ -146,135 +135,112 @@ export class FindingSystem {
   }
 
   /**
-   * Secretly distributes exactly 15 hidden crystals across eligible tiles on the board.
-   * Crystals are NOT placed visibly on the board at stage start.
-   * They remain hidden until the player rolls over and conquers the tile (tile:discovered).
-   *
-   * Exact breakdown:
+   * Prepares the secret pool of exactly 15 crystals for the board:
    * - 1 - 3 Card Crystals ('modifier', 🃏)
    * - 1 - 2 Life Crystals ('emerald_crystal', +1❤️)
    * - 10 - 13 Points Crystals ('points_crystal', +250💎)
    * Total pool = exactly 15!
    *
-   * @param {Object} tileManager
+   * Crystals are NOT placed visibly on the board at stage start.
+   * They are uncovered dynamically as the player rolls over and conquers tiles!
    */
   setupBoardCrystals(tileManager) {
-    if (!tileManager || !this.instancedMesh) return;
+    if (!this.instancedMesh) return;
 
     // Clean reset any existing findings before configuring new board crystals
     this.reset();
-
-    const availableTiles = [];
-    const tilesX = tileManager.tilesX || 18;
-    const tilesY = tileManager.tilesY || 36;
-
-    for (let y = 0; y < tilesY; y++) {
-      for (let x = 0; x < tilesX; x++) {
-        if (!tileManager.isObstacle(x, y)) {
-          // Exclude default player spawn location
-          if (x === 9 && y === 18) {
-            continue;
-          }
-          availableTiles.push({ gridX: x, gridY: y });
-        }
-      }
-    }
-
-    if (availableTiles.length === 0) return;
-
-    // Fisher-Yates shuffle available tiles for fair random distribution
-    for (let i = availableTiles.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      const temp = availableTiles[i];
-      availableTiles[i] = availableTiles[j];
-      availableTiles[j] = temp;
-    }
 
     // Exact proportions summing to exactly 15 instances:
     const countCards = Math.floor(Math.random() * 3) + 1; // 1 to 3
     const countLife = Math.floor(Math.random() * 2) + 1;   // 1 to 2
     const countPoints = this.TOTAL_CRYSTALS - countCards - countLife; // 10 to 13 (sum = 15)
 
-    let slotIdx = 0;
+    // Build randomized queue of crystal specifications for the 15 slots
+    const crystalSpecs = [];
+    for (let c = 0; c < countCards; c++) {
+      crystalSpecs.push({
+        type: 'modifier',
+        color: this._colorCard,
+        value: 100,
+        radius: 0.017,
+        labelText: '🃏',
+        labelClass: 'crystal-countdown ready',
+        rotSpeed: 1.6
+      });
+    }
+    for (let l = 0; l < countLife; l++) {
+      crystalSpecs.push({
+        type: 'emerald_crystal',
+        color: this._colorLife,
+        value: 200,
+        radius: 0.018,
+        labelText: '+1❤️',
+        labelClass: 'crystal-countdown emerald ready',
+        rotSpeed: 2.0
+      });
+    }
+    for (let p = 0; p < countPoints; p++) {
+      crystalSpecs.push({
+        type: 'points_crystal',
+        color: this._colorPoints,
+        value: 250,
+        radius: 0.018,
+        labelText: '+250💎',
+        labelClass: 'crystal-countdown points ready',
+        rotSpeed: 2.0
+      });
+    }
 
-    // Helper to configure a secret hidden slot in the InstancedMesh
-    const configureSlot = (type, color, value, radius, labelText, labelClass, rotSpeed) => {
-      if (slotIdx >= this.TOTAL_CRYSTALS || slotIdx >= availableTiles.length) return;
-      const tile = availableTiles[slotIdx];
-      const worldPos = tileManager.getTileWorldPos(tile.gridX, tile.gridY);
-      const index = tileManager.getTileIndex(tile.gridX, tile.gridY);
-      const slot = this._slots[slotIdx];
+    // Fisher-Yates shuffle the crystal sequence
+    for (let i = crystalSpecs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const temp = crystalSpecs[i];
+      crystalSpecs[i] = crystalSpecs[j];
+      crystalSpecs[j] = temp;
+    }
 
-      // Secretly pre-assigned: NOT revealed and NOT active yet!
+    // Configure the 15 slots in the InstancedMesh
+    for (let i = 0; i < this.TOTAL_CRYSTALS; i++) {
+      const spec = crystalSpecs[i];
+      const slot = this._slots[i];
+
       slot.active = false;
       slot.revealed = false;
       slot.animatingSpawn = false;
       slot.spawnProgress = 0;
       slot.id = this._nextId++;
-      slot.type = type;
-      slot.tileIndex = index;
-      slot.gridX = tile.gridX;
-      slot.gridY = tile.gridY;
-      slot.baseX = worldPos.x;
-      slot.baseZ = worldPos.z;
-      slot.baseY = 0.042;
-      slot.currentY = 0.042;
-      slot.targetScale = radius;
+      slot.type = spec.type;
+      slot.tileIndex = -1;
+      slot.gridX = 0;
+      slot.gridY = 0;
+      slot.baseX = 0;
+      slot.baseZ = 0;
+      slot.baseY = 0.034;
+      slot.currentY = 0.034;
+      slot.targetScale = spec.radius;
       slot.currentScale = 0;
       slot.rotationX = 0;
       slot.rotationY = Math.random() * Math.PI * 2;
-      slot.rotationSpeed = rotSpeed;
+      slot.rotationSpeed = spec.rotSpeed;
       slot.timeOffset = Math.random() * Math.PI * 2;
       slot.amplitude = 0.008;
-      slot.color = color;
-      slot.value = value;
-      slot.labelText = labelText;
-      slot.labelClass = labelClass;
+      slot.color = spec.color;
+      slot.value = spec.value;
+      slot.labelText = spec.labelText;
+      slot.labelClass = spec.labelClass;
       slot.labelId = null;
 
-      // Position anchor object at the tile, but keep it hidden until revealed
-      slot.anchorObject.position.set(worldPos.x, slot.baseY, worldPos.z);
+      // Keep hidden initially
+      slot.anchorObject.position.set(0, -999, 0);
       slot.anchorObject.visible = false;
 
-      // Pre-set instance color in InstancedMesh
-      this.instancedMesh.setColorAt(slotIdx, color);
+      this.instancedMesh.setColorAt(i, spec.color);
 
-      // Hide instance transform far below table with zero scale
       this._dummy.position.set(0, -999, 0);
       this._dummy.rotation.set(0, 0, 0);
       this._dummy.scale.set(0, 0, 0);
       this._dummy.updateMatrix();
-      this.instancedMesh.setMatrixAt(slotIdx, this._dummy.matrix);
-
-      slotIdx++;
-    };
-
-    // 1. Configure Card Crystals (1 - 3)
-    for (let c = 0; c < countCards; c++) {
-      configureSlot('modifier', this._colorCard, 100, 0.015, '🃏', 'crystal-countdown ready', 1.6);
-    }
-
-    // 2. Configure Life Crystals (1 - 2)
-    for (let l = 0; l < countLife; l++) {
-      configureSlot('emerald_crystal', this._colorLife, 200, 0.016, '+1❤️', 'crystal-countdown emerald ready', 2.0);
-    }
-
-    // 3. Configure Points Crystals (remaining slots, 10 - 13)
-    for (let p = 0; p < countPoints; p++) {
-      configureSlot('points_crystal', this._colorPoints, 250, 0.016, '+250💎', 'crystal-countdown points ready', 2.0);
-    }
-
-    // Hide any unused slots (if available tiles was somehow < 15)
-    while (slotIdx < this.TOTAL_CRYSTALS) {
-      const slot = this._slots[slotIdx];
-      slot.active = false;
-      slot.revealed = false;
-      slot.anchorObject.visible = false;
-      this._dummy.position.set(0, -999, 0);
-      this._dummy.scale.set(0, 0, 0);
-      this._dummy.updateMatrix();
-      this.instancedMesh.setMatrixAt(slotIdx, this._dummy.matrix);
-      slotIdx++;
+      this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
     }
 
     this.instancedMesh.instanceMatrix.needsUpdate = true;
@@ -291,26 +257,44 @@ export class FindingSystem {
   }
 
   /**
-   * Triggered when a tile is rolled over and conquered by the player.
-   * If this tile secretly hides one of our 15 crystals, it is revealed with an animation.
+   * Triggered when a tile is conquered by the player.
+   * Uncovers the next hidden crystal from the 15-pool with genuine organic discovery!
    */
   _onTileDiscovered({ tileIndex, x, z, gridX, gridY }) {
     this._tilesDiscoveredCount = (this._tilesDiscoveredCount || 0) + 1;
     if (!this.instancedMesh || tileIndex === undefined) return;
 
-    // Check if any of our 15 secret slots is hidden on this discovered tile
-    const slot = this._slots.find(s => s.tileIndex === tileIndex && !s.revealed);
+    // Check if we still have unrevealed crystals in the pool of 15
+    if (this._uncoveredCount >= this.TOTAL_CRYSTALS) return;
+
+    // Organic discovery pacing:
+    // First crystal reveals quickly (around 2nd or 3rd tile conquered),
+    // subsequent crystals uncover roughly every 3-4 tiles conquered
+    const shouldUncover = (this._uncoveredCount === 0 && this._tilesDiscoveredCount >= 2) ||
+      (this._tilesDiscoveredCount % 4 === 0) ||
+      (Math.random() < 0.28);
+
+    if (!shouldUncover) return;
+
+    // Find first unrevealed slot in the pool
+    const slot = this._slots.find(s => !s.revealed);
     if (!slot) return;
 
-    // UNCOVER / REVEAL THE HIDDEN CRYSTAL!
+    // UNCOVER / REVEAL THIS CRYSTAL AT CONQUERED TILE COORDINATES!
+    this._uncoveredCount++;
     slot.revealed = true;
     slot.active = true;
     slot.animatingSpawn = true;
     slot.spawnProgress = 0;
-    slot.currentScale = 0;
+    slot.tileIndex = tileIndex;
+    slot.gridX = (gridX !== undefined) ? gridX : 0;
+    slot.gridY = (gridY !== undefined) ? gridY : 0;
+    slot.baseX = x;
+    slot.baseZ = z;
+    slot.currentScale = 0.001;
 
     // Position and show anchor object for CSS2D label
-    slot.anchorObject.position.set(slot.baseX, slot.baseY, slot.baseZ);
+    slot.anchorObject.position.set(x, slot.baseY, z);
     slot.anchorObject.visible = true;
 
     if (this._labelSystem && slot.labelId === null) {
@@ -321,9 +305,9 @@ export class FindingSystem {
       });
     }
 
-    // Set instance color & initial position
+    // Update instance color & initial position
     this.instancedMesh.setColorAt(slot.index, slot.color);
-    this._dummy.position.set(slot.baseX, slot.baseY, slot.baseZ);
+    this._dummy.position.set(x, slot.baseY, z);
     this._dummy.rotation.set(0, slot.rotationY, 0);
     this._dummy.scale.set(0.001, 0.001, 0.001);
     this._dummy.updateMatrix();
@@ -351,7 +335,7 @@ export class FindingSystem {
     };
     this._findings.set(slot.id, findingData);
 
-    // Audio cue for uncovering a hidden crystal
+    // Juicy audio cue for uncovering a hidden crystal
     if (slot.type === 'modifier') {
       playSound(1200, 0.28);
     } else if (slot.type === 'emerald_crystal') {
@@ -385,9 +369,10 @@ export class FindingSystem {
     if (slotIdx === -1) return; // Pool full (all 15 instances used)
 
     const slot = this._slots[slotIdx];
+    this._uncoveredCount++;
     const isModifier = (type === 'modifier');
     const color = isModifier ? this._colorCard : (type === 'emerald_crystal' ? this._colorLife : this._colorPoints);
-    const radius = isModifier ? 0.015 : 0.016;
+    const radius = isModifier ? 0.017 : 0.018;
     const labelText = isModifier ? '🃏' : (type === 'emerald_crystal' ? '+1❤️' : '+250💎');
     const labelClass = isModifier ? 'crystal-countdown ready' : (type === 'emerald_crystal' ? 'crystal-countdown emerald ready' : 'crystal-countdown points ready');
     const value = isModifier ? 100 : (type === 'emerald_crystal' ? 200 : 250);
@@ -401,10 +386,10 @@ export class FindingSystem {
     slot.tileIndex = tileIndex;
     slot.baseX = worldX;
     slot.baseZ = worldZ;
-    slot.baseY = 0.042;
-    slot.currentY = 0.042;
+    slot.baseY = 0.034;
+    slot.currentY = 0.034;
     slot.targetScale = radius;
-    slot.currentScale = 0;
+    slot.currentScale = 0.001;
     slot.rotationX = 0;
     slot.rotationY = 0;
     slot.rotationSpeed = isModifier ? 1.6 : 2.0;
@@ -475,7 +460,7 @@ export class FindingSystem {
         slot.spawnProgress = Math.min(1.0, slot.spawnProgress + gameplayDelta * 4.5);
         // Elastic overshoot easing for juicy gem pop
         const p = slot.spawnProgress;
-        const overshoot = 1.25;
+        const overshoot = 1.30;
         const eased = (p < 0.7)
           ? (p / 0.7) * overshoot
           : overshoot - ((p - 0.7) / 0.3) * (overshoot - 1.0);
@@ -491,7 +476,7 @@ export class FindingSystem {
 
       // Continuous rotation
       slot.rotationY += slot.rotationSpeed * gameplayDelta;
-      slot.rotationX += slot.rotationSpeed * 0.45 * gameplayDelta;
+      slot.rotationX += slot.rotationSpeed * 0.40 * gameplayDelta;
 
       // Floating & Bobbing
       slot.currentY = slot.baseY + Math.sin(elapsed * 2.2 + slot.timeOffset) * slot.amplitude;
@@ -526,12 +511,12 @@ export class FindingSystem {
       const dx = slot.baseX - bx;
       const dz = slot.baseZ - bz;
       const distSq = dx * dx + dz * dz;
-      const crystalRadius = (slot.type === 'modifier') ? 0.016 : 0.018;
+      const crystalRadius = (slot.type === 'modifier') ? 0.020 : 0.022;
       const collectRadius = ballRadius + crystalRadius;
 
       if (distSq < collectRadius * collectRadius) {
         slot.active = false;
-        slot.revealed = false;
+        slot.revealed = true; // Mark as uncovered & collected
         slot.anchorObject.visible = false;
 
         if (slot.labelId !== null && this._labelSystem) {
@@ -581,6 +566,7 @@ export class FindingSystem {
 
   reset() {
     this._tilesDiscoveredCount = 0;
+    this._uncoveredCount = 0;
     this._totalModifiersSpawned = 0;
     this._findings.clear();
 

@@ -87,6 +87,7 @@ export class Game {
         this._maxZoom = 1.45;
         this._battleCameraProgress = 0.0;
         this._targetBattleCameraProgress = 0.0;
+        this._currentCameraZone = 1; // 0 = Top, 1 = Middle, 2 = Bottom (virtual 3 equal zones)
 
         // Table selector (Entry Phase)
         this.tableSelector = null;
@@ -703,16 +704,44 @@ export class Game {
             const p = Math.max(0, Math.min(1, this._battleCameraProgress));
             const smoothP = p * p * (3 - 2 * p); // smoothstep S(p)
 
-            // Camera follow with fluid zoom & exponential decay dampening
+            // Camera follow with 3-zone intelligent framing & fluid ball tracking
             const ball3DX = ballPos.x - this._tableCenterX;
             const ball3DZ = ballPos.y - this._tableCenterZ;
 
-            // Overview target
-            const normCamTargetX = ball3DX * GAME_CONFIG.camera.followStrength;
-            const normCamTargetY = GAME_CONFIG.camera.height * this._cameraZoom;
-            const normCamTargetZ = (GAME_CONFIG.camera.zOffset + ball3DZ * GAME_CONFIG.camera.followStrength) * this._cameraZoom;
+            // 3 Equal Zones along Z:
+            // Zone 0: Top [-0.535, -0.1783], center -0.3567
+            // Zone 1: Middle [-0.1783, 0.1783], center 0.0
+            // Zone 2: Bottom [0.1783, 0.535], center 0.3567
+            // Hysteresis thresholds avoid jitter near boundaries
+            if (this._currentCameraZone === 0) {
+                if (ball3DZ > -0.14) this._currentCameraZone = 1;
+            } else if (this._currentCameraZone === 1) {
+                if (ball3DZ < -0.20) this._currentCameraZone = 0;
+                else if (ball3DZ > 0.20) this._currentCameraZone = 2;
+            } else {
+                if (ball3DZ < 0.14) this._currentCameraZone = 1;
+            }
 
-            // Close-up target centered on ball
+            const zoneCenters = [-0.3567, 0.0, 0.3567];
+            const zoneCenterZ = zoneCenters[this._currentCameraZone];
+
+            // Dynamic camera distance calculated from aspect ratio to ensure zone fits on portrait screens
+            // with generous 2/3 margins above and below while ball remains centered
+            const aspect = this.camera.aspect || (window.innerWidth / window.innerHeight);
+            const aspectFactor = Math.max(0.40, Math.min(1.0, aspect / 0.85));
+            const baseHeight = (0.75 / aspectFactor) * this._cameraZoom;
+            const baseZOffset = baseHeight * 0.48;
+
+            // Intelligent tracking: blend zone center framing with real-time ball position
+            const normLookAtX = ball3DX * 0.55;
+            const normLookAtY = 0;
+            const normLookAtZ = zoneCenterZ * 0.40 + ball3DZ * 0.60;
+
+            const normCamTargetX = ball3DX * 0.50;
+            const normCamTargetY = baseHeight;
+            const normCamTargetZ = normLookAtZ + baseZOffset;
+
+            // Close-up target centered on ball for slow-mo bullet-time
             const closeCamTargetX = ball3DX;
             const closeCamTargetY = 0.26;
             const closeCamTargetZ = ball3DZ + 0.22;
@@ -722,7 +751,7 @@ export class Game {
             const camTargetY = normCamTargetY + (closeCamTargetY - normCamTargetY) * smoothP;
             const camTargetZ = normCamTargetZ + (closeCamTargetZ - normCamTargetZ) * smoothP;
 
-            const camLerp = 1.0 - Math.exp(-GAME_CONFIG.camera.lerpSpeed * delta);
+            const camLerp = 1.0 - Math.exp(-4.2 * delta);
             this._currentCamPos.x += (camTargetX - this._currentCamPos.x) * camLerp;
             this._currentCamPos.y += (camTargetY - this._currentCamPos.y) * camLerp;
             this._currentCamPos.z += (camTargetZ - this._currentCamPos.z) * camLerp;
@@ -734,10 +763,6 @@ export class Game {
             );
 
             // Overview lookAt vs Close-up lookAt
-            const normLookAtX = ball3DX * 0.12;
-            const normLookAtY = 0;
-            const normLookAtZ = ball3DZ * 0.12;
-
             const closeLookAtX = ball3DX;
             const closeLookAtY = GAME_CONFIG.ball.radius;
             const closeLookAtZ = ball3DZ;
@@ -760,10 +785,12 @@ export class Game {
             this.tableSelector.update(timestamp);
             this._cameraZoom += (this._targetCameraZoom - this._cameraZoom) * Math.min(delta * 5.0, 1.0);
 
-            // Elevated table overview camera during tile selection
+            // Elevated table overview camera during tile selection (responsive to aspect ratio)
+            const selAspect = this.camera.aspect || (window.innerWidth / window.innerHeight);
+            const selAspectFactor = Math.max(0.40, Math.min(1.0, selAspect / 0.85));
             const camTargetX = 0;
-            const camTargetY = (GAME_CONFIG.camera.height * 1.22) * this._cameraZoom;
-            const camTargetZ = (GAME_CONFIG.camera.zOffset * 1.15) * this._cameraZoom;
+            const camTargetY = (GAME_CONFIG.camera.height * 1.20 / selAspectFactor) * this._cameraZoom;
+            const camTargetZ = (GAME_CONFIG.camera.zOffset * 1.15 / selAspectFactor) * this._cameraZoom;
 
             const camLerp = 1.0 - Math.exp(-GAME_CONFIG.camera.lerpSpeed * delta);
             this._currentCamPos.x += (camTargetX - this._currentCamPos.x) * camLerp;
@@ -877,6 +904,7 @@ export class Game {
 
         this._currentTiltX = 0;
         this._currentTiltY = 0;
+        this._currentCameraZone = 1;
         this.boardGroup.rotation.set(0, 0, 0);
 
         eventBus.emit('timer:changed', {
@@ -963,6 +991,9 @@ export class Game {
         if (this.stageBriefing) {
             this.stageBriefing.hide();
         }
+
+        // Initialize active camera zone immediately to chosen starting zone (0=Top, 1=Middle, 2=Bottom)
+        this._currentCameraZone = (gridY < 12) ? 0 : (gridY < 24 ? 1 : 2);
 
         // Calibrate handheld gyro resting posture at launch moment & enforce orientation lock
         inputManager.calibrate();
