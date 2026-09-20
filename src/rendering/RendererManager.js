@@ -7,10 +7,9 @@ export class RendererManager {
     constructor(container) {
         this.container = container;
         this.renderer = new THREE.WebGLRenderer({
-            antialias: !GRAPHICS_CONFIG.isMobile,
+            antialias: true,
             alpha: false,
-            powerPreference: 'high-performance',
-            precision: GRAPHICS_CONFIG.isMobile ? 'mediump' : 'highp'
+            powerPreference: 'default'
         });
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 10);

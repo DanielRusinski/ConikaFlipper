@@ -128,6 +128,7 @@ export class Game {
         // 5. Post-processing
         this.postProcessing = new PostProcessingManager();
         this.postProcessing.init(this.renderer, this.scene, this.camera);
+        this.postProcessing.resize(window.innerWidth, window.innerHeight, this.renderer.getPixelRatio());
 
         // 6. Board group
         this.boardGroup = new THREE.Group();
@@ -1202,7 +1203,7 @@ export class Game {
         const w = window.innerWidth;
         const h = window.innerHeight;
         this.rendererManager.resize(w, h);
-        this.postProcessing.resize(w, h, Math.min(window.devicePixelRatio, GRAPHICS_CONFIG.pixelRatioCap));
+        this.postProcessing.resize(w, h, this.renderer.getPixelRatio());
         this.labelSystem.resize(w, h);
         if (this.transitionManager) {
             this.transitionManager.resize(w, h, Math.min(window.devicePixelRatio, GRAPHICS_CONFIG.pixelRatioCap));

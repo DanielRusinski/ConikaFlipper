@@ -67,8 +67,9 @@ export class ShadowSystem {
 
         this._frameCounter++;
 
-        if (this.updateFrequency <= 1) {
+        if (this.updateFrequency <= 1 || !this.keyLight || !this.keyLight.shadow || !this.keyLight.shadow.map) {
             renderer.shadowMap.autoUpdate = true;
+            renderer.shadowMap.needsUpdate = true;
         } else {
             renderer.shadowMap.autoUpdate = false;
             if (this._frameCounter % this.updateFrequency === 0) {

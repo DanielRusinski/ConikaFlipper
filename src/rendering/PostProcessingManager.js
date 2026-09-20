@@ -20,12 +20,15 @@ const FilmGrainShader = {
         }
     `,
     fragmentShader: `
+        precision highp float;
         uniform sampler2D tDiffuse;
         uniform float intensity;
         varying vec2 vUv;
         
         float random(vec2 co) {
-            return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+            highp float dt = dot(co.xy, vec2(12.9898, 78.233));
+            highp float sn = mod(dt, 3.14159265);
+            return fract(sin(sn) * 43758.5453);
         }
 
         void main() {
@@ -58,6 +61,8 @@ export class PostProcessingManager {
         this.camera = camera;
 
         this.composer = new EffectComposer(this.renderer);
+        this.composer.setSize(window.innerWidth, window.innerHeight);
+        this.composer.setPixelRatio(this.renderer.getPixelRatio());
         
         this.renderPass = new RenderPass(this.scene, this.camera);
         this.composer.addPass(this.renderPass);
@@ -140,7 +145,14 @@ export class PostProcessingManager {
 
     render() {
         if (this.enabled && this.composer) {
-            this.composer.render();
+            try {
+                this.composer.render();
+            } catch (err) {
+                console.error('EffectComposer error, falling back to direct render:', err);
+                if (this.renderer && this.scene && this.camera) {
+                    this.renderer.render(this.scene, this.camera);
+                }
+            }
         } else if (this.renderer && this.scene && this.camera) {
             this.renderer.render(this.scene, this.camera);
         }

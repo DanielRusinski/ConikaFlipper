@@ -41,13 +41,14 @@ export class FindingSystem {
     // Diamond / gem octahedron geometry shared across all 15 crystal instances
     this._octaGeometry = new THREE.OctahedronGeometry(1, 0);
 
-    // Glowing crystal material that multiplies instance color into emissive for Bloom
+    // Glowing crystal material with vertexColors enabled so Three.js natively passes vColor
     this._material = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       roughness: 0.15,
       metalness: 0.25,
       transparent: true,
-      opacity: 0.95
+      opacity: 0.95,
+      vertexColors: true
     });
 
     this._material.onBeforeCompile = (shader) => {
@@ -55,8 +56,8 @@ export class FindingSystem {
         '#include <emissivemap_fragment>',
         `
         #include <emissivemap_fragment>
-        #ifdef USE_INSTANCING_COLOR
-          totalEmissiveRadiance += vInstanceColor.rgb * 2.5;
+        #if defined( USE_COLOR )
+          totalEmissiveRadiance += vColor.rgb * 2.5;
         #endif
         `
       );
