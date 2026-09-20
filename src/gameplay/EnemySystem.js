@@ -522,6 +522,10 @@ export class EnemySystem {
         if (cellParticles) {
             cellParticles.trigger(enemy.x, enemy.z, false);
         }
+
+        // Chromatic aberration flash and camera tremor on enemy entrance
+        eventBus.emit('fx:chromaticAberration', { intensity: 0.009, duration: 0.25 });
+        eventBus.emit('fx:shake', { trauma: 0.18 });
     }
 
     update(dt) {
@@ -1221,6 +1225,10 @@ export class EnemySystem {
             x: actualX,
             z: actualZ
         });
+
+        // Chromatic aberration and camera shake on enemy destruction
+        eventBus.emit('fx:chromaticAberration', { intensity: 0.015, duration: 0.35 });
+        eventBus.emit('fx:shake', { trauma: 0.35 });
 
         // 8. Remove from enemies array
         const idx = this._enemies.indexOf(enemy);

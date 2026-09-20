@@ -10,7 +10,8 @@ import { eventBus } from '../core/EventBus.js';
 const FilmGrainShader = {
     uniforms: {
         tDiffuse: { value: null },
-        intensity: { value: 0.04 }
+        intensity: { value: 0.04 },
+        chromaticAberration: { value: 0.0 }
     },
     vertexShader: `
         varying vec2 vUv;
@@ -23,6 +24,7 @@ const FilmGrainShader = {
         precision highp float;
         uniform sampler2D tDiffuse;
         uniform float intensity;
+        uniform float chromaticAberration;
         varying vec2 vUv;
         
         float random(vec2 co) {
@@ -32,7 +34,20 @@ const FilmGrainShader = {
         }
 
         void main() {
-            vec4 color = texture2D(tDiffuse, vUv);
+            vec4 color;
+            if (chromaticAberration > 0.0001) {
+                vec2 dir = vUv - 0.5;
+                float dist = length(dir);
+                vec2 shift = dir * (dist * chromaticAberration * 2.5);
+                float r = texture2D(tDiffuse, vUv - shift).r;
+                float g = texture2D(tDiffuse, vUv).g;
+                float b = texture2D(tDiffuse, vUv + shift).b;
+                float a = texture2D(tDiffuse, vUv).a;
+                color = vec4(r, g, b, a);
+            } else {
+                color = texture2D(tDiffuse, vUv);
+            }
+
             // Single static fixed noise frame - not animated per frame for zero GPU overhead
             float noise = (random(vUv * 750.0) - 0.5) * intensity;
             color.rgb += noise;
@@ -53,6 +68,12 @@ export class PostProcessingManager {
         this.outputPass = null;
         this.enabled = true;
         this._qualityUnsub = null;
+        this._eventUnsubs = [];
+
+        // Chromatic aberration dynamic impulse state
+        this._chromaticAberration = 0.0;
+        this._chromaticDuration = 0.35;
+        this._chromaticTimer = 0.0;
     }
 
     init(renderer, scene, camera) {
@@ -89,6 +110,37 @@ export class PostProcessingManager {
                 this.setQuality(config);
             }
         });
+
+        const chromaUnsub = eventBus.on('fx:chromaticAberration', ({ intensity, duration }) => {
+            this.triggerChromaticAberration(intensity, duration);
+        });
+        this._eventUnsubs.push(chromaUnsub);
+    }
+
+    triggerChromaticAberration(amount = 0.018, duration = 0.35) {
+        this._chromaticAberration = Math.max(this._chromaticAberration, amount);
+        this._chromaticDuration = Math.max(0.05, duration);
+        this._chromaticTimer = this._chromaticDuration;
+        if (this.grainPass && this.grainPass.uniforms.chromaticAberration) {
+            this.grainPass.uniforms.chromaticAberration.value = this._chromaticAberration;
+        }
+    }
+
+    update(deltaTime) {
+        if (this._chromaticTimer > 0) {
+            this._chromaticTimer -= deltaTime;
+            if (this._chromaticTimer <= 0) {
+                this._chromaticTimer = 0;
+                this._chromaticAberration = 0;
+            } else {
+                const progress = this._chromaticTimer / this._chromaticDuration;
+                // Quadratic decay for punchy flash falloff
+                this._chromaticAberration = this._chromaticAberration * Math.pow(progress, 2.0);
+            }
+            if (this.grainPass && this.grainPass.uniforms.chromaticAberration) {
+                this.grainPass.uniforms.chromaticAberration.value = this._chromaticAberration;
+            }
+        }
     }
 
     setQuality(qualityConfig) {
@@ -203,6 +255,10 @@ export class PostProcessingManager {
         if (this._qualityUnsub) {
             this._qualityUnsub();
             this._qualityUnsub = null;
+        }
+        if (this._eventUnsubs) {
+            this._eventUnsubs.forEach(u => u && u());
+            this._eventUnsubs = [];
         }
         if (this.composer) {
             this.composer.passes.forEach(pass => {

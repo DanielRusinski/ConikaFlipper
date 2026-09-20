@@ -1,17 +1,19 @@
 import {
   Group,
   Object3D,
-  BoxGeometry,
+  PlaneGeometry,
   MeshBasicMaterial,
   InstancedMesh,
   AdditiveBlending,
-  DynamicDrawUsage
+  DynamicDrawUsage,
+  DoubleSide
 } from 'three';
 import { eventBus } from './core/EventBus.js';
 
 export const cellParticles = {
   group: null,
   instancedMesh: null,
+  camera: null,
   count: 120,
   maxActiveParticles: 60,
   particleLifetime: 0.5,
@@ -21,7 +23,7 @@ export const cellParticles = {
   dummy: new Object3D(),
   _qualityUnsub: null,
 
-  init(parentGroup) {
+  init(parentGroup, camera = null) {
     if (!parentGroup) {
       console.error('cellParticles.init: parentGroup is required.');
       return;
@@ -29,14 +31,19 @@ export const cellParticles = {
 
     this.group = new Group();
     this.particles = [];
+    if (camera) {
+      this.camera = camera;
+    }
 
-    const geometry = new BoxGeometry(0.008, 0.008, 0.008);
+    // 2-triangle quad geometry (replaces 12-triangle cubes for 83% vertex reduction)
+    const geometry = new PlaneGeometry(0.008, 0.008);
 
     const material = new MeshBasicMaterial({
       color: 0x00ffff,
       transparent: true,
       opacity: 1,
       blending: AdditiveBlending,
+      side: DoubleSide,
       depthWrite: false,
       depthTest: true
     });
@@ -130,11 +137,11 @@ export const cellParticles = {
           particle.z
         );
 
-        this.dummy.rotation.set(
-          Math.random() * Math.PI,
-          Math.random() * Math.PI,
-          Math.random() * Math.PI
-        );
+        if (this.camera) {
+          this.dummy.quaternion.copy(this.camera.quaternion);
+        } else {
+          this.dummy.rotation.set(0, 0, 0);
+        }
 
         this.dummy.scale.set(1, 1, 1);
         this.dummy.updateMatrix();
@@ -178,7 +185,11 @@ export const cellParticles = {
         particle.vz = Math.sin(phi) * Math.sin(theta) * speed;
 
         this.dummy.position.set(particle.x, particle.y, particle.z);
-        this.dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+        if (this.camera) {
+          this.dummy.quaternion.copy(this.camera.quaternion);
+        } else {
+          this.dummy.rotation.set(0, 0, 0);
+        }
         this.dummy.scale.set(1.4, 1.4, 1.4);
         this.dummy.updateMatrix();
 
@@ -192,9 +203,19 @@ export const cellParticles = {
     }
   },
 
-  update(dt) {
+  setCamera(camera) {
+    if (camera) {
+      this.camera = camera;
+    }
+  },
+
+  update(dt, camera = null) {
     if (!this.instancedMesh || !Number.isFinite(dt) || dt <= 0) {
       return;
+    }
+
+    if (camera) {
+      this.camera = camera;
     }
 
     const deltaTime = Math.min(dt, 0.05);
@@ -228,6 +249,13 @@ export const cellParticles = {
           particle.y,
           particle.z
         );
+
+        // Always face camera as billboard quad
+        if (this.camera) {
+          this.dummy.quaternion.copy(this.camera.quaternion);
+        } else {
+          this.dummy.rotation.set(0, 0, 0);
+        }
 
         const lifeProgress = Math.max(
           0,

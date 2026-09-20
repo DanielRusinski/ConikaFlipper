@@ -47,7 +47,16 @@ export class SettingsPanel {
             adaptiveQuality: GRAPHICS_CONFIG.adaptiveQuality?.enabled ?? true,
             maxPixelRatio: GRAPHICS_CONFIG.pixelRatioCap || 2,
             currentQualityTier: 'high',
-            shadowsEnabled: true
+            shadowsEnabled: true,
+            pointLightsEnabled: true,
+            pointLightsAutoCycle: true,
+            pointLightsIntensity: 2.0,
+            pointLightsPulsing: true,
+            pointLightsSpeed: 3.0,
+            pinkLightColor: '#ff44aa',
+            pinkLightDistance: 30,
+            blueLightColor: '#3377ff',
+            blueLightDistance: 50
         };
     }
     init() {
@@ -91,6 +100,19 @@ export class SettingsPanel {
         lightFolder.addBinding(this._params, 'dirPosY', { min: 0, max: 20 });
         lightFolder.addBinding(this._params, 'dirPosZ', { min: -20, max: 20 });
         
+        const pointLightsFolder = this._pane.addFolder({ title: 'Point Lights / Światła Punktowe', expanded: false });
+        pointLightsFolder.addBinding(this._params, 'pointLightsEnabled', { label: 'Aktywne' });
+        pointLightsFolder.addBinding(this._params, 'pointLightsAutoCycle', { label: 'Cykl 2-4 (30s)' });
+        pointLightsFolder.addBinding(this._params, 'pointLightsIntensity', { label: 'Moc bazowa', min: 0.0, max: 6.0, step: 0.1 });
+        pointLightsFolder.addBinding(this._params, 'pointLightsPulsing', { label: 'Pulsacja' });
+        pointLightsFolder.addBinding(this._params, 'pointLightsSpeed', { label: 'Szybkość pulsu', min: 0.5, max: 8.0, step: 0.2 });
+        pointLightsFolder.addBinding(this._params, 'pinkLightColor', { label: 'Kolor Róż' });
+        pointLightsFolder.addBinding(this._params, 'pinkLightDistance', { label: 'Zasięg Róż', min: 5, max: 80, step: 1 });
+        pointLightsFolder.addBinding(this._params, 'blueLightColor', { label: 'Kolor Niebieski' });
+        pointLightsFolder.addBinding(this._params, 'blueLightDistance', { label: 'Zasięg Niebieski', min: 5, max: 100, step: 1 });
+        const randLightsBtn = pointLightsFolder.addButton({ title: 'Losuj Pozycje Świateł' });
+        randLightsBtn.on('click', () => eventBus.emit('request:randomizeLights'));
+        
         const worldFolder = this._pane.addFolder({ title: 'World', expanded: false });
         worldFolder.addBinding(this._params, 'tilesX', { min: 4, max: 50, step: 1 });
         worldFolder.addBinding(this._params, 'tilesY', { min: 4, max: 80, step: 1 });
@@ -118,6 +140,9 @@ export class SettingsPanel {
 
         const summonDragonBtn = worldFolder.addButton({ title: 'Summon Dragon (🐉)' });
         summonDragonBtn.on('click', () => eventBus.emit('card:summonDragon', { duration: 6 }));
+
+        const spawnCentipedeBtn = worldFolder.addButton({ title: 'Spawn Centipede (🐛)' });
+        spawnCentipedeBtn.on('click', () => eventBus.emit('request:spawnCentipede'));
         
         const ballFolder = this._pane.addFolder({ title: 'Ball', expanded: false });
         ballFolder.addBinding(this._params, 'ballType', { options: { brass: 'brass', marble: 'marble', wood: 'wood' }});

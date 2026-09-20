@@ -30,7 +30,7 @@ export class ScoreSystem {
       }),
       eventBus.on('modifier:selected', (data) => {
         if (data.card && data.card.effectType === 'scoreMultiplier') {
-          this.setMultiplier(data.card.value || 2, data.card.duration || 10);
+          this.setMultiplier(data.card.effectValue || data.card.value || 2, data.card.duration || 30);
         }
       }),
       eventBus.on('enemy:destroyed', (data) => {

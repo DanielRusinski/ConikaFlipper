@@ -34,6 +34,7 @@ import { InventorySystem } from '../gameplay/InventorySystem.js';
 import { BombSystem } from '../gameplay/BombSystem.js';
 import { DragonSystem } from '../gameplay/DragonSystem.js';
 import { EnemySystem } from '../gameplay/EnemySystem.js';
+import { CentipedeSystem } from '../gameplay/CentipedeSystem.js';
 
 import { ScreenManager } from '../ui/ScreenManager.js';
 import { GameHUD } from '../ui/GameHUD.js';
@@ -95,9 +96,24 @@ export class Game {
         // Enemy system
         this.enemySystem = null;
 
+        // Centipede system (Stonoga)
+        this.centipedeSystem = null;
+
+        // Camera shake trauma state
+        this._camTrauma = 0.0;
+        this._camShakeOffset = new THREE.Vector3();
+
+        // Respawn countdown state (9 to 0)
+        this._respawnCountdown = null;
+        this._respawnCountdownInt = 9;
+
         // Tilt state
         this._currentTiltX = 0;
         this._currentTiltY = 0;
+    }
+
+    triggerCameraShake(amount = 0.45) {
+        this._camTrauma = Math.min(1.0, Math.max(this._camTrauma, amount));
     }
 
     async init() {
@@ -272,7 +288,7 @@ export class Game {
         this.pickupAnimations = new PickupAnimations();
 
         // 18. Particles
-        cellParticles.init(this.boardGroup);
+        cellParticles.init(this.boardGroup, this.camera);
 
         // 18b. Table selector (Entry phase)
         this.tableSelector = new TableSelector();
@@ -289,6 +305,17 @@ export class Game {
         // 18e. Enemy system (Cylinder / Walce)
         this.enemySystem = new EnemySystem();
         this.enemySystem.init(this.boardGroup, this.tileManager, this.ballController, this.dragonSystem, this.labelSystem);
+
+        // 18f. Centipede system (Stonoga)
+        this.centipedeSystem = new CentipedeSystem();
+        this.centipedeSystem.init(
+            this.boardGroup,
+            this.tileManager,
+            this.ballController,
+            this.labelSystem,
+            this.enemySystem,
+            this.laserHazardSystem
+        );
 
         // Zoom event listeners (mouse wheel + touch pinch)
         this.renderer.domElement.addEventListener('wheel', (e) => {
@@ -500,10 +527,39 @@ export class Game {
                 this.postProcessing.setBloomEnabled(value);
             } else if (key === 'shadowsEnabled') {
                 this.shadowSystem.setEnabled(value);
+            } else if (key === 'pointLightsEnabled') {
+                if (this.lightingSystem) this.lightingSystem.setPointLightsEnabled(value);
+            } else if (key === 'pointLightsIntensity') {
+                if (this.lightingSystem) this.lightingSystem.setPointLightsIntensity(value);
+            } else if (key === 'pointLightsPulsing') {
+                if (this.lightingSystem) this.lightingSystem.setPointLightsPulsing(value);
+            } else if (key === 'pointLightsSpeed') {
+                if (this.lightingSystem) this.lightingSystem.setPointLightsSpeed(value);
+            } else if (key === 'pinkLightColor') {
+                if (this.lightingSystem) this.lightingSystem.setPinkLightColor(value);
+            } else if (key === 'pinkLightDistance') {
+                if (this.lightingSystem) this.lightingSystem.setPinkLightDistance(value);
+            } else if (key === 'blueLightColor') {
+                if (this.lightingSystem) this.lightingSystem.setBlueLightColor(value);
+            } else if (key === 'blueLightDistance') {
+                if (this.lightingSystem) this.lightingSystem.setBlueLightDistance(value);
+            } else if (key === 'pointLightsAutoCycle') {
+                if (this.lightingSystem) this.lightingSystem.setPointLightsAutoCycle(value);
             }
         });
 
+        // Screen shake listener
+        eventBus.on('fx:shake', ({ trauma }) => {
+            this.triggerCameraShake(trauma || 0.45);
+        });
+
         // Debug actions from settings
+        eventBus.on('request:randomizeLights', () => {
+            if (this.lightingSystem) {
+                this.lightingSystem.randomizeAccentLights();
+            }
+        });
+
         eventBus.on('request:spawnGreenCrystal', () => {
             if (this.findingSystem && this.ballController && this.ballController.mesh) {
                 const pos = this.ballController.mesh.position;
@@ -515,6 +571,12 @@ export class Game {
             if (this.findingSystem && this.ballController && this.ballController.mesh) {
                 const pos = this.ballController.mesh.position;
                 this.findingSystem._spawnFinding(pos.x + 0.04, pos.z + 0.04, 0, 'modifier');
+            }
+        });
+
+        eventBus.on('request:spawnCentipede', () => {
+            if (this.centipedeSystem) {
+                this.centipedeSystem.spawn();
             }
         });
 
@@ -584,14 +646,28 @@ export class Game {
         // Adaptive quality (evaluates rolling average FPS, frame time, and WebGL metrics)
         qualityManager.update(performanceManager.fps, delta, this.renderer ? this.renderer.info : null);
 
+        // Update camera trauma shake decay
+        if (this._camTrauma > 0) {
+            this._camTrauma = Math.max(0, this._camTrauma - delta * 2.8);
+            const shake = (this._camTrauma * this._camTrauma) * 0.024;
+            this._camShakeOffset.set(
+                (Math.random() * 2 - 1) * shake,
+                (Math.random() * 2 - 1) * (shake * 0.5),
+                (Math.random() * 2 - 1) * shake
+            );
+        } else {
+            this._camShakeOffset.set(0, 0, 0);
+        }
+
         const isPlaying = gameStateManager.is(GAME_STATES.PLAYING);
         const isSlowMo = gameStateManager.is(GAME_STATES.SLOW_MOTION_MENU);
+        const isModifierSelect = gameStateManager.is(GAME_STATES.MODIFIER_SELECTION);
 
-        if (isPlaying || isSlowMo) {
-            // Map input tilt to physics angles
+        if (isPlaying || isSlowMo || isModifierSelect) {
+            // Map input tilt to physics angles (neutralized during card selection modal)
             const maxTilt = GAME_CONFIG.physics.maxTilt;
-            const targetTiltX = inputManager.tiltX * maxTilt;
-            const targetTiltY = inputManager.tiltY * maxTilt;
+            const targetTiltX = isModifierSelect ? 0 : (inputManager.tiltX * maxTilt);
+            const targetTiltY = isModifierSelect ? 0 : (inputManager.tiltY * maxTilt);
 
             // Smooth tilt interpolation
             const tiltLerp = Math.min(delta * 10, 1.0);
@@ -618,11 +694,13 @@ export class Game {
                 ballPos.x = updatedPos.x;
                 ballPos.y = updatedPos.y;
 
-                // Tile discovery
-                this.tileManager.checkAndUpdate(ballPos.x, ballPos.y, gameplayDelta);
+                // Tile discovery (only during active playing)
+                if (isPlaying) {
+                    this.tileManager.checkAndUpdate(ballPos.x, ballPos.y, gameplayDelta);
+                }
 
-                // Findings collection check
-                if (this.ballController.mesh) {
+                // Findings collection check (prevent double collection during card modal)
+                if (this.ballController.mesh && !isModifierSelect) {
                     this.findingSystem.checkCollection(
                         this.ballController.mesh.position.x,
                         this.ballController.mesh.position.z,
@@ -635,7 +713,7 @@ export class Game {
             this.findingSystem.update(gameplayDelta);
 
             // Laser hazard
-            if (this.laserHazardSystem && (isPlaying || isSlowMo)) {
+            if (this.laserHazardSystem && (isPlaying || isSlowMo || isModifierSelect)) {
                 const ball3D = (ballActive && this.ballController && this.ballController.mesh)
                     ? this.ballController.mesh.position
                     : null;
@@ -661,7 +739,7 @@ export class Game {
             }
 
             // Enemy system (Cylinder / Walce patrolling 3x3 perimeters)
-            if (this.enemySystem && (isPlaying || isSlowMo)) {
+            if (this.enemySystem && (isPlaying || isSlowMo || isModifierSelect)) {
                 try {
                     this.enemySystem.update(gameplayDelta);
                 } catch (err) {
@@ -669,8 +747,19 @@ export class Game {
                 }
             }
 
-            // Score multiplier expiry
-            this.scoreSystem.update(elapsed);
+            // Centipede enemy system (Stonoga)
+            if (this.centipedeSystem && (isPlaying || isSlowMo || isModifierSelect)) {
+                try {
+                    this.centipedeSystem.update(gameplayDelta);
+                } catch (err) {
+                    console.error('CentipedeSystem update error:', err);
+                }
+            }
+
+            // Score multiplier expiry (only ticks down during active play)
+            if (isPlaying) {
+                this.scoreSystem.update(elapsed);
+            }
 
             // Game timer (only countdown during PLAYING, not slow-mo selection screens)
             if (isPlaying) {
@@ -698,7 +787,7 @@ export class Game {
             this._cameraZoom += (this._targetCameraZoom - this._cameraZoom) * Math.min(delta * 5.0, 1.0);
 
             // Battle camera zoom progress (smooth transition in/out of bullet-time close-up)
-            this._targetBattleCameraProgress = isSlowMo ? 1.0 : 0.0;
+            this._targetBattleCameraProgress = (isSlowMo || isModifierSelect) ? 1.0 : 0.0;
             const battleLerpRate = 1.0 - Math.exp(-5.0 * delta);
             this._battleCameraProgress += (this._targetBattleCameraProgress - this._battleCameraProgress) * battleLerpRate;
             const p = Math.max(0, Math.min(1, this._battleCameraProgress));
@@ -757,9 +846,9 @@ export class Game {
             this._currentCamPos.z += (camTargetZ - this._currentCamPos.z) * camLerp;
 
             this.camera.position.set(
-                this._currentCamPos.x,
-                this._currentCamPos.y,
-                this._currentCamPos.z
+                this._currentCamPos.x + this._camShakeOffset.x,
+                this._currentCamPos.y + this._camShakeOffset.y,
+                this._currentCamPos.z + this._camShakeOffset.z
             );
 
             // Overview lookAt vs Close-up lookAt
@@ -776,7 +865,7 @@ export class Game {
             this.camera.lookAt(this._camLookAt);
 
             // Particles
-            cellParticles.update(gameplayDelta);
+            cellParticles.update(gameplayDelta, this.camera);
 
         } else if (gameStateManager.is(GAME_STATES.SELECTION)) {
             this._targetBattleCameraProgress = 0.0;
@@ -785,12 +874,11 @@ export class Game {
             this.tableSelector.update(timestamp);
             this._cameraZoom += (this._targetCameraZoom - this._cameraZoom) * Math.min(delta * 5.0, 1.0);
 
-            // Elevated table overview camera during tile selection (responsive to aspect ratio)
-            const selAspect = this.camera.aspect || (window.innerWidth / window.innerHeight);
-            const selAspectFactor = Math.max(0.40, Math.min(1.0, selAspect / 0.85));
+            // Elevated table overview camera during tile selection (start of board and respawn)
+            // Framed close to the table showing almost entire table (-10% top, -10% bottom trimmed)
             const camTargetX = 0;
-            const camTargetY = (GAME_CONFIG.camera.height * 1.20 / selAspectFactor) * this._cameraZoom;
-            const camTargetZ = (GAME_CONFIG.camera.zOffset * 1.15 / selAspectFactor) * this._cameraZoom;
+            const camTargetY = 0.98 * this._cameraZoom;
+            const camTargetZ = 0.24 * this._cameraZoom;
 
             const camLerp = 1.0 - Math.exp(-GAME_CONFIG.camera.lerpSpeed * delta);
             this._currentCamPos.x += (camTargetX - this._currentCamPos.x) * camLerp;
@@ -798,11 +886,11 @@ export class Game {
             this._currentCamPos.z += (camTargetZ - this._currentCamPos.z) * camLerp;
 
             this.camera.position.set(
-                this._currentCamPos.x,
-                this._currentCamPos.y,
-                this._currentCamPos.z
+                this._currentCamPos.x + this._camShakeOffset.x,
+                this._currentCamPos.y + this._camShakeOffset.y,
+                this._currentCamPos.z + this._camShakeOffset.z
             );
-            this._targetCamLookAt.set(0, 0, 0);
+            this._targetCamLookAt.set(0, 0, 0.03);
             this._camLookAt.lerp(this._targetCamLookAt, camLerp);
             this.camera.lookAt(this._camLookAt);
 
@@ -815,9 +903,49 @@ export class Game {
                 }
             }
 
+            if (this.centipedeSystem) {
+                try {
+                    this.centipedeSystem.update(delta);
+                } catch (err) {
+                    console.error('CentipedeSystem update error in selection:', err);
+                }
+            }
+
             // Particles update during selection
             if (cellParticles && cellParticles.update) {
-                cellParticles.update(delta);
+                cellParticles.update(delta, this.camera);
+            }
+
+            // Respawn countdown handling (9 to 0) & auto-launch
+            if (this._respawnCountdown !== null) {
+                this._respawnCountdown -= delta;
+                const curCount = Math.max(0, Math.ceil(this._respawnCountdown));
+                if (curCount !== this._respawnCountdownInt && curCount >= 0) {
+                    this._respawnCountdownInt = curCount;
+                    if (this.stageBriefing) {
+                        this.stageBriefing.updateCountdown(curCount);
+                    }
+                    if (curCount > 0) {
+                        playSound(700 + (9 - curCount) * 40, 0.10);
+                    }
+                }
+
+                if (this._respawnCountdown <= 0) {
+                    this._respawnCountdown = null;
+                    playSound(1150, 0.25);
+                    // Automatically place ball at current selector position
+                    let gx = this.tableSelector ? this.tableSelector.gridX : (GAME_CONFIG.spawn.defaultGridX || 9);
+                    let gy = this.tableSelector ? this.tableSelector.gridY : (GAME_CONFIG.spawn.defaultGridY || 18);
+                    if (this.tileManager && this.tileManager.isObstacle(gx, gy)) {
+                        const safe = this._findNearestSafeTile(gx, gy);
+                        gx = safe.gx;
+                        gy = safe.gy;
+                    }
+                    if (this.tableSelector) {
+                        this.tableSelector.deactivate();
+                    }
+                    this.launchBall(gx, gy);
+                }
             }
 
         } else if (gameStateManager.is(GAME_STATES.TITLE)) {
@@ -825,9 +953,9 @@ export class Game {
             const swayX = Math.sin(elapsed * 0.3) * 0.05;
             const swayZ = Math.cos(elapsed * 0.2) * 0.03;
             this.camera.position.set(
-                swayX,
-                GAME_CONFIG.camera.height,
-                GAME_CONFIG.camera.zOffset + swayZ
+                swayX + this._camShakeOffset.x,
+                GAME_CONFIG.camera.height + this._camShakeOffset.y,
+                GAME_CONFIG.camera.zOffset + swayZ + this._camShakeOffset.z
             );
             this.camera.lookAt(0, 0, 0);
         }
@@ -850,8 +978,16 @@ export class Game {
         shaderManager.updateAllTime(elapsed);
 
         // Render
+        if (this.lightingSystem && this.lightingSystem.update) {
+            this.lightingSystem.update(delta);
+        }
+
         if (this.shadowSystem) {
             this.shadowSystem.update(this.renderer);
+        }
+
+        if (this.postProcessing) {
+            this.postProcessing.update(delta);
         }
 
         if (this.transitionManager.isTransitioning()) {
@@ -878,6 +1014,7 @@ export class Game {
         this.ballLifeSystem.reset();
         this._gameTimer = GAME_CONFIG.timer.startingSeconds;
         this._gameOverTriggered = false;
+        this._respawnCountdown = null;
 
         // Full clean reset of conquered tiles back to default silver
         this.tileManager.reset();
@@ -904,6 +1041,11 @@ export class Game {
         // Full clean reset of enemies
         if (this.enemySystem) {
             this.enemySystem.reset();
+        }
+
+        // Full clean reset of centipede
+        if (this.centipedeSystem) {
+            this.centipedeSystem.reset();
         }
 
         this._currentTiltX = 0;
@@ -964,13 +1106,13 @@ export class Game {
             // Player lost 1 life: after a brief destruction pause, allow player to pick a valid tile to respawn
             setTimeout(() => {
                 if (gameStateManager.is(GAME_STATES.PLAYING) || gameStateManager.is(GAME_STATES.SELECTION) || gameStateManager.is(GAME_STATES.SLOW_MOTION_MENU)) {
-                    this.respawnEntryPhase();
+                    this.respawnEntryPhase(true);
                 }
             }, 450);
         }
     }
 
-    respawnEntryPhase() {
+    respawnEntryPhase(isRespawn = false) {
         this.screenManager.hideAll();
         this.gameHUD.show();
 
@@ -982,12 +1124,21 @@ export class Game {
             this.dragonSystem.reset();
         }
 
-        // Show stage briefing banner during tile selection
-        if (this.stageBriefing) {
-            this.stageBriefing.show(
-                this.currentStage,
-                this.tileManager ? this.tileManager.getTotalPlayableTiles() : null
-            );
+        // Show stage briefing banner or respawn countdown
+        if (isRespawn) {
+            this._respawnCountdown = 9.0;
+            this._respawnCountdownInt = 9;
+            if (this.stageBriefing) {
+                this.stageBriefing.showRespawnCountdown(9);
+            }
+        } else {
+            this._respawnCountdown = null;
+            if (this.stageBriefing) {
+                this.stageBriefing.show(
+                    this.currentStage,
+                    this.tileManager ? this.tileManager.getTotalPlayableTiles() : null
+                );
+            }
         }
 
         // Fully deactivate ball until starting tile is confirmed
@@ -1005,10 +1156,32 @@ export class Game {
 
     startEntryPhase() {
         this.resetGame();
-        this.respawnEntryPhase();
+        this.respawnEntryPhase(false);
+    }
+
+    _findNearestSafeTile(startGX, startGY) {
+        if (!this.tileManager) return { gx: startGX, gy: startGY };
+        if (!this.tileManager.isObstacle(startGX, startGY)) return { gx: startGX, gy: startGY };
+
+        // Spiral search for nearest non-obstacle tile
+        for (let r = 1; r < Math.max(this.tileManager.tilesX, this.tileManager.tilesY); r++) {
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    const gx = startGX + dx;
+                    const gy = startGY + dy;
+                    if (gx >= 0 && gx < this.tileManager.tilesX && gy >= 0 && gy < this.tileManager.tilesY) {
+                        if (!this.tileManager.isObstacle(gx, gy)) {
+                            return { gx, gy };
+                        }
+                    }
+                }
+            }
+        }
+        return { gx: GAME_CONFIG.spawn.defaultGridX || 9, gy: GAME_CONFIG.spawn.defaultGridY || 18 };
     }
 
     launchBall(gridX, gridY) {
+        this._respawnCountdown = null;
         if (this.stageBriefing) {
             this.stageBriefing.hide();
         }
@@ -1112,6 +1285,9 @@ export class Game {
         if (this.enemySystem) {
             this.enemySystem.reset();
         }
+        if (this.centipedeSystem) {
+            this.centipedeSystem.reset();
+        }
 
         // Add 1 bonus life for clearing the stage
         this.ballLifeSystem.addLife(1);
@@ -1119,6 +1295,7 @@ export class Game {
         // Reset timer to full starting seconds
         this._gameTimer = GAME_CONFIG.timer.startingSeconds;
         this._gameOverTriggered = false;
+        this._respawnCountdown = null;
 
         // 4. Update shadow system and capture fresh new board into RenderTargetB
         if (this.shadowSystem) {
@@ -1132,7 +1309,7 @@ export class Game {
         gameStateManager.setState(GAME_STATES.TRANSITION);
 
         this.transitionManager.transitionTo(GAME_STATES.SELECTION, {
-            duration: 1300,
+            duration: GRAPHICS_CONFIG.transition?.duration || 2600,
             onRenderB: () => {
                 this.renderer.render(this.scene, this.camera);
             },
@@ -1312,6 +1489,7 @@ export class Game {
         if (this.bombSystem) this.bombSystem.dispose();
         if (this.dragonSystem) this.dragonSystem.dispose();
         if (this.enemySystem) this.enemySystem.dispose();
+        if (this.centipedeSystem) this.centipedeSystem.dispose();
         this.obstacleManager.dispose();
         this.tileManager.dispose();
 

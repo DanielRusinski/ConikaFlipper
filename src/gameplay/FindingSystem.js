@@ -12,6 +12,11 @@ export class FindingSystem {
 
     // Total number of all crystal types combined (hidden, active, and collected total): strictly 15
     this.TOTAL_CRYSTALS = 15;
+    // Maximum simultaneous visible crystals on the board at any time: strictly 5
+    this.MAX_SIMULTANEOUS_VISIBLE = 5;
+    this._minuteRerollTimer = 0;
+    this._discoveryInterval = 2.5; // Allows uncovering at least 5 crystals per 20 seconds during tile flipping
+    this._discoveryCooldown = 0;   // Ready immediately at start
     this._slots = [];
     this._nextId = 0;
     this._tilesDiscoveredCount = 0;
@@ -148,7 +153,18 @@ export class FindingSystem {
 
     this._group.add(this._ghostInstancedMesh);
     this._group.add(this.instancedMesh);
-    this._unsub = eventBus.on('tile:discovered', this._onTileDiscovered.bind(this));
+    this._findingBoostTimer = null;
+    this._unsubs = [
+      eventBus.on('tile:discovered', this._onTileDiscovered.bind(this)),
+      eventBus.on('modifier:finding', (data) => {
+        const duration = (data && data.duration) ? data.duration : 20;
+        this._discoveryInterval = 1.2;
+        if (this._findingBoostTimer) clearTimeout(this._findingBoostTimer);
+        this._findingBoostTimer = setTimeout(() => {
+          this._discoveryInterval = 2.5;
+        }, duration * 1000);
+      })
+    ];
   }
 
   setLabelSystem(labelSystem) {
@@ -311,24 +327,28 @@ export class FindingSystem {
     this._tilesDiscoveredCount = (this._tilesDiscoveredCount || 0) + 1;
     if (!this.instancedMesh || tileIndex === undefined) return;
 
-    // Check if we still have unrevealed crystals in the pool of 15
-    if (this._uncoveredCount >= this.TOTAL_CRYSTALS) return;
+    // Strict cap: never display more than 5 crystals simultaneously on the board (active + inactive/ghost)
+    const visibleCount = this._slots.filter(s => s.revealed && s.state !== 'collected').length;
+    if (visibleCount >= this.MAX_SIMULTANEOUS_VISIBLE) return;
 
-    // Organic discovery pacing:
-    // First crystal reveals quickly (around 2nd or 3rd tile conquered),
-    // subsequent crystals uncover roughly every 3-4 tiles conquered
-    const shouldUncover = (this._uncoveredCount === 0 && this._tilesDiscoveredCount >= 2) ||
-      (this._tilesDiscoveredCount % 4 === 0) ||
-      (Math.random() < 0.28);
+    // Discovery throttle: paces discovery so at least 5 crystals can be uncovered per 20s
+    if (this._discoveryCooldown > 0) return;
+
+    // Rapid organic discovery pacing when board has < 5 crystals:
+    // First crystal reveals on 1st or 2nd tile, subsequent ones on almost every tile flip once cooldown passes
+    const shouldUncover = (this._uncoveredCount === 0 && this._tilesDiscoveredCount >= 1) ||
+      (this._tilesDiscoveredCount % 2 === 0) ||
+      (Math.random() < 0.75);
 
     if (!shouldUncover) return;
 
-    // Find first unrevealed slot in the pool
-    const slot = this._slots.find(s => !s.revealed);
+    // Find first available unrevealed slot in the pool (recycled slots allow continuous discovery throughout entire gameplay)
+    const slot = this._slots.find(s => !s.revealed && s.state === 'hidden');
     if (!slot) return;
 
     // UNCOVER / REVEAL THIS CRYSTAL AS A TRANSPARENT BOUNCING GHOST!
     this._uncoveredCount++;
+    this._discoveryCooldown = this._discoveryInterval; // ~2.5s interval -> at least 5 crystals per 20s
     slot.revealed = true;
     slot.active = true;
     slot.state = 'ghost_bouncing';
@@ -495,6 +515,20 @@ export class FindingSystem {
     if (!this.instancedMesh) return;
     const elapsed = timeManager.elapsed;
 
+    // Decrement discovery cooldown
+    if (this._discoveryCooldown > 0) {
+      this._discoveryCooldown -= gameplayDelta;
+      if (this._discoveryCooldown < 0) this._discoveryCooldown = 0;
+    }
+
+    // Periodic 20-second lottery re-roll for undiscovered crystals
+    // Active and inactive revealed crystals remain on the board for the player to collect smoothly!
+    this._minuteRerollTimer += gameplayDelta;
+    if (this._minuteRerollTimer >= 20.0) {
+      this._minuteRerollTimer = 0;
+      this._rerollHiddenCrystals();
+    }
+
     for (let i = 0; i < this.TOTAL_CRYSTALS; i++) {
       const slot = this._slots[i];
       if (!slot.active || !slot.revealed || slot.state === 'collected' || slot.state === 'hidden') {
@@ -514,14 +548,15 @@ export class FindingSystem {
 
       if (slot.state === 'ghost_bouncing') {
         slot.timer += gameplayDelta;
-        const totalBounceDuration = 0.85;
+        const totalBounceDuration = 1.45; // 2 extra bounces (5 damped bounces total)
+        const totalActivationDuration = 6.0; // Exactly 6 seconds from discovery to activation
 
         if (slot.timer < totalBounceDuration) {
-          // Phase 1: Bouncing transparent crystal (2-3 quick damped bounces above tile)
+          // Phase 1: Bouncing transparent crystal (5 quick damped bounces above tile)
           const p = slot.timer / totalBounceDuration;
-          const bounceH = 0.024 * Math.abs(Math.sin(p * Math.PI * 3.5)) * (1.0 - p * 0.6);
+          const bounceH = 0.028 * Math.abs(Math.sin(p * Math.PI * 5.5)) * Math.pow(1.0 - p, 0.85);
           slot.currentY = slot.baseY + bounceH;
-          slot.currentScale = slot.targetScale * Math.min(1.0, p * 3.0);
+          slot.currentScale = slot.targetScale * Math.min(1.0, p * 2.5);
 
           // Update ghost mesh transform
           this._dummy.position.set(slot.baseX, slot.currentY, slot.baseZ);
@@ -538,8 +573,8 @@ export class FindingSystem {
           this._dummy.updateMatrix();
           this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
 
-        } else if (slot.timer < totalBounceDuration + 1.0) {
-          // Phase 2: Rests transparent for 1.0s before filling with color
+        } else if (slot.timer < totalActivationDuration) {
+          // Phase 2: Rests transparent and bobs gently until 6.0 seconds elapse from discovery
           slot.currentY = slot.baseY + Math.sin(elapsed * 2.2 + slot.timeOffset) * slot.amplitude;
           slot.currentScale = slot.targetScale;
 
@@ -557,7 +592,7 @@ export class FindingSystem {
           this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
 
         } else {
-          // Phase 3: Fills with full solid glowing color!
+          // Phase 3: Fills with full solid glowing color after 6.0s!
           slot.state = 'solid_ready';
           slot.currentScale = slot.targetScale;
           slot.anchorObject.visible = true;
@@ -637,8 +672,10 @@ export class FindingSystem {
 
       if (distSq < collectRadius * collectRadius) {
         slot.active = false;
-        slot.state = 'collected';
+        slot.state = 'hidden'; // Recycled to hidden so discovery continues throughout entire gameplay
+        slot.revealed = false;
         slot.anchorObject.visible = false;
+        slot.timer = 0;
 
         if (slot.labelId !== null && this._labelSystem) {
           this._labelSystem.removeLabel(slot.labelId);
@@ -656,36 +693,163 @@ export class FindingSystem {
           this._ghostInstancedMesh.instanceMatrix.needsUpdate = true;
         }
 
-        if (slot.type === 'points_crystal') {
+        // CRITICAL: Capture the crystal's actual collected properties BEFORE re-rolling the slot!
+        const collectedType = slot.type;
+        const collectedValue = slot.value;
+        const collectedId = slot.id;
+
+        // Re-roll fresh spec for this recycled slot respecting board limits:
+        const currentCards = this._slots.filter(s => s.revealed && s.type === 'modifier').length;
+        const currentLife = this._slots.filter(s => s.revealed && s.type === 'emerald_crystal').length;
+
+        let nextType = 'points_crystal';
+        if (currentCards < 2 && Math.random() < 0.20) {
+          nextType = 'modifier';
+        } else if (currentLife < 1 && Math.random() < 0.20) {
+          nextType = 'emerald_crystal';
+        }
+
+        const isModifier = (nextType === 'modifier');
+        const color = isModifier ? this._colorCard : (nextType === 'emerald_crystal' ? this._colorLife : this._colorPoints);
+        const radius = isModifier ? 0.017 : 0.018;
+        const labelText = isModifier ? '🃏' : (nextType === 'emerald_crystal' ? '+1❤️' : '+250💎');
+        const labelClass = isModifier ? 'crystal-countdown ready' : (nextType === 'emerald_crystal' ? 'crystal-countdown emerald ready' : 'crystal-countdown points ready');
+        const value = isModifier ? 100 : (nextType === 'emerald_crystal' ? 200 : 250);
+
+        slot.type = nextType;
+        slot.color = color;
+        slot.value = value;
+        slot.targetScale = radius;
+        slot.rotationSpeed = isModifier ? 1.6 : 2.0;
+        slot.labelText = labelText;
+        slot.labelClass = labelClass;
+
+        this.instancedMesh.setColorAt(i, color);
+        if (this._ghostInstancedMesh) {
+          this._ghostInstancedMesh.setColorAt(i, color);
+        }
+        if (this.instancedMesh.instanceColor) this.instancedMesh.instanceColor.needsUpdate = true;
+        if (this._ghostInstancedMesh && this._ghostInstancedMesh.instanceColor) this._ghostInstancedMesh.instanceColor.needsUpdate = true;
+
+        if (collectedType === 'points_crystal') {
           eventBus.emit('finding:collected', {
-            id: slot.id,
-            value: slot.value,
+            id: collectedId,
+            value: collectedValue,
             type: 'points_crystal'
           });
           playSound(1250, 0.2);
-        } else if (slot.type === 'emerald_crystal') {
+        } else if (collectedType === 'emerald_crystal') {
           eventBus.emit('finding:collected', {
-            id: slot.id,
-            value: slot.value,
+            id: collectedId,
+            value: collectedValue,
             type: 'emerald_crystal',
             givesLife: true
           });
           playSound(1450, 0.25);
         } else {
+          // 'modifier' - Pink crystal!
           eventBus.emit('modifier:collected', {
-            id: slot.id,
-            value: slot.value,
+            id: collectedId,
+            value: collectedValue,
             type: 'modifier'
           });
           playSound(1500, 0.3);
         }
 
-        const finding = this._findings.get(slot.id);
+        const finding = this._findings.get(collectedId);
         if (finding) {
           finding.active = false;
-          this._findings.delete(slot.id);
+          this._findings.delete(collectedId);
         }
       }
+    }
+  }
+
+  /**
+   * Resets and re-randomizes the pool of undiscovered crystals every 60 seconds of gameplay.
+   * Already uncovered active and inactive crystals remain completely intact on the board.
+   */
+  _rerollHiddenCrystals() {
+    const hiddenSlots = this._slots.filter(s => !s.revealed && s.state === 'hidden');
+    if (hiddenSlots.length === 0) return;
+
+    // Count crystals already uncovered or collected on this board
+    const existingCards = this._slots.filter(s => s.revealed && s.type === 'modifier').length;
+    const existingLife = this._slots.filter(s => s.revealed && s.type === 'emerald_crystal').length;
+
+    // Board targets: 1-3 cards, 1-2 life, remaining points
+    const targetCards = Math.floor(Math.random() * 3) + 1;
+    const targetLife = Math.floor(Math.random() * 2) + 1;
+
+    const neededCards = Math.max(0, Math.min(hiddenSlots.length, targetCards - existingCards));
+    const neededLife = Math.max(0, Math.min(hiddenSlots.length - neededCards, targetLife - existingLife));
+    const neededPoints = Math.max(0, hiddenSlots.length - neededCards - neededLife);
+
+    const specs = [];
+    for (let c = 0; c < neededCards; c++) {
+      specs.push({
+        type: 'modifier',
+        color: this._colorCard,
+        value: 100,
+        radius: 0.017,
+        labelText: '🃏',
+        labelClass: 'crystal-countdown ready',
+        rotSpeed: 1.6
+      });
+    }
+    for (let l = 0; l < neededLife; l++) {
+      specs.push({
+        type: 'emerald_crystal',
+        color: this._colorLife,
+        value: 200,
+        radius: 0.018,
+        labelText: '+1❤️',
+        labelClass: 'crystal-countdown emerald ready',
+        rotSpeed: 2.0
+      });
+    }
+    for (let p = 0; p < neededPoints; p++) {
+      specs.push({
+        type: 'points_crystal',
+        color: this._colorPoints,
+        value: 250,
+        radius: 0.018,
+        labelText: '+250💎',
+        labelClass: 'crystal-countdown points ready',
+        rotSpeed: 2.0
+      });
+    }
+
+    // Shuffle fresh specs
+    for (let i = specs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const temp = specs[i];
+      specs[i] = specs[j];
+      specs[j] = temp;
+    }
+
+    // Assign to hidden slots only (uncovered active and inactive crystals remain completely intact!)
+    for (let i = 0; i < hiddenSlots.length; i++) {
+      const slot = hiddenSlots[i];
+      const spec = specs[i];
+      slot.type = spec.type;
+      slot.color = spec.color;
+      slot.value = spec.value;
+      slot.targetScale = spec.radius;
+      slot.rotationSpeed = spec.rotSpeed;
+      slot.labelText = spec.labelText;
+      slot.labelClass = spec.labelClass;
+      this.instancedMesh.setColorAt(slot.index, spec.color);
+      if (this._ghostInstancedMesh) {
+        this._ghostInstancedMesh.setColorAt(slot.index, spec.color);
+      }
+    }
+
+    if (this.instancedMesh.instanceColor) {
+      this.instancedMesh.instanceColor.needsUpdate = true;
+    }
+    if (this._ghostInstancedMesh && this._ghostInstancedMesh.instanceColor) {
+      this._ghostInstancedMesh.instanceColor.needsUpdate = true;
     }
   }
 
@@ -693,6 +857,8 @@ export class FindingSystem {
     this._tilesDiscoveredCount = 0;
     this._uncoveredCount = 0;
     this._totalModifiersSpawned = 0;
+    this._minuteRerollTimer = 0;
+    this._discoveryCooldown = 0;
     this._findings.clear();
 
     for (let i = 0; i < this.TOTAL_CRYSTALS; i++) {
@@ -731,6 +897,14 @@ export class FindingSystem {
   }
 
   dispose() {
+    if (this._findingBoostTimer) {
+      clearTimeout(this._findingBoostTimer);
+      this._findingBoostTimer = null;
+    }
+    if (this._unsubs) {
+      this._unsubs.forEach(u => u());
+      this._unsubs = [];
+    }
     if (this._unsub) {
       this._unsub();
       this._unsub = null;

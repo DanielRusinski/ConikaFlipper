@@ -1,4 +1,5 @@
 import { GAME_CONFIG } from '../config/gameConfig.js';
+import { eventBus } from '../core/EventBus.js';
 
 export class CollisionSystem {
     constructor() {
@@ -13,6 +14,15 @@ export class CollisionSystem {
         this._tableWidth = 0;
         this._tableHeight = 0;
         this._obstacles = [];
+        this._speedMultiplier = 1.0;
+        this._speedBoostTimer = null;
+        this._unsubSpeed = eventBus.on('modifier:speed', ({ value, duration }) => {
+            this._speedMultiplier = value || 1.4;
+            if (this._speedBoostTimer) clearTimeout(this._speedBoostTimer);
+            this._speedBoostTimer = setTimeout(() => {
+                this._speedMultiplier = 1.0;
+            }, (duration || 15) * 1000);
+        });
     }
 
     init(tableWidth, tableHeight, ballRadius) {
@@ -23,8 +33,9 @@ export class CollisionSystem {
     }
 
     setTilt(angleX, angleY) {
-        this.gx = GAME_CONFIG.physics.gravity * Math.sin(angleX);
-        this.gy = GAME_CONFIG.physics.gravity * Math.sin(angleY);
+        const mult = this._speedMultiplier || 1.0;
+        this.gx = GAME_CONFIG.physics.gravity * Math.sin(angleX) * mult;
+        this.gy = GAME_CONFIG.physics.gravity * Math.sin(angleY) * mult;
     }
 
     setObstacles(obstacleAABBs) {
@@ -42,11 +53,12 @@ export class CollisionSystem {
         this.vy *= damp;
         
         const speedSq = this.vx * this.vx + this.vy * this.vy;
-        const maxSpeedSq = GAME_CONFIG.physics.maxSpeed * GAME_CONFIG.physics.maxSpeed;
+        const currentMaxSpeed = GAME_CONFIG.physics.maxSpeed * (this._speedMultiplier || 1.0);
+        const maxSpeedSq = currentMaxSpeed * currentMaxSpeed;
         if (speedSq > maxSpeedSq) {
             const speed = Math.sqrt(speedSq);
-            this.vx = (this.vx / speed) * GAME_CONFIG.physics.maxSpeed;
-            this.vy = (this.vy / speed) * GAME_CONFIG.physics.maxSpeed;
+            this.vx = (this.vx / speed) * currentMaxSpeed;
+            this.vy = (this.vy / speed) * currentMaxSpeed;
         }
 
         const substeps = GAME_CONFIG.physics.maxSubsteps;
@@ -55,7 +67,7 @@ export class CollisionSystem {
         for (let i = 0; i < substeps; i++) {
             this.px += this.vx * subDt;
             this.py += this.vy * subDt;
-            this._resolveCollisions();
+            this._resolveCollisions(subDt);
         }
         
         if (Math.sqrt(this.vx * this.vx + this.vy * this.vy) < GAME_CONFIG.physics.restThreshold &&
@@ -65,33 +77,56 @@ export class CollisionSystem {
         }
     }
     
-    _resolveCollisions() {
+    _resolveCollisions(subDt = 0.0033) {
         const r = this._radius;
         const rest = GAME_CONFIG.physics.wallRestitution;
-        const fric = 1 - GAME_CONFIG.physics.wallFriction;
+        // Tangential friction scaled smoothly with timestep so it never strangles sliding speed
+        const tanDamp = Math.max(0, 1.0 - GAME_CONFIG.physics.wallFriction * subDt * 2.5);
+        const bounceThreshold = 0.12;
         
+        // 1. Table Borders / Cushions (left, right, top, bottom)
+        // Left wall
         if (this.px - r < 0) {
             this.px = r;
-            this.vx = -this.vx * rest;
-            this.vy *= fric;
+            if (this.vx < 0) {
+                this.vx = (this.vx < -bounceThreshold) ? -this.vx * rest : 0;
+            }
+            this.vy *= tanDamp;
         } else if (this.px + r > this._tableWidth) {
+            // Right wall
             this.px = this._tableWidth - r;
-            this.vx = -this.vx * rest;
-            this.vy *= fric;
+            if (this.vx > 0) {
+                this.vx = (this.vx > bounceThreshold) ? -this.vx * rest : 0;
+            }
+            this.vy *= tanDamp;
         }
         
+        // Top wall
         if (this.py - r < 0) {
             this.py = r;
-            this.vy = -this.vy * rest;
-            this.vx *= fric;
+            if (this.vy < 0) {
+                this.vy = (this.vy < -bounceThreshold) ? -this.vy * rest : 0;
+            }
+            this.vx *= tanDamp;
         } else if (this.py + r > this._tableHeight) {
+            // Bottom wall
             this.py = this._tableHeight - r;
-            this.vy = -this.vy * rest;
-            this.vx *= fric;
+            if (this.vy > 0) {
+                this.vy = (this.vy > bounceThreshold) ? -this.vy * rest : 0;
+            }
+            this.vx *= tanDamp;
         }
         
+        // 2. Obstacles / Elevated Columns / Raised Tiles
         for (let i = 0; i < this._obstacles.length; i++) {
             const obs = this._obstacles[i];
+
+            // Broadphase bounding box cull for high mobile performance
+            if (this.px + r < obs.minX || this.px - r > obs.maxX ||
+                this.py + r < obs.minZ || this.py - r > obs.maxZ) {
+                continue;
+            }
+
             const testX = Math.max(obs.minX, Math.min(this.px, obs.maxX));
             const testY = Math.max(obs.minZ, Math.min(this.py, obs.maxZ));
             
@@ -105,21 +140,50 @@ export class CollisionSystem {
                 const nx = dx / dist;
                 const ny = dy / dist;
                 
+                // Position separation along contact normal
                 this.px += nx * pen;
                 this.py += ny * pen;
                 
-                const dot = this.vx * nx + this.vy * ny;
-                if (dot < 0) {
-                    this.vx = (this.vx - (1 + rest) * dot * nx) * fric;
-                    this.vy = (this.vy - (1 + rest) * dot * ny) * fric;
+                // Velocity component along outward normal
+                const vn = this.vx * nx + this.vy * ny;
+
+                // Only resolve if ball is moving into the obstacle
+                if (vn < 0) {
+                    const normalImpulse = (vn < -bounceThreshold) ? -(1 + rest) * vn : -vn;
+                    this.vx += normalImpulse * nx;
+                    this.vy += normalImpulse * ny;
+
+                    // Preserve tangential slide component past the column
+                    const tx = -ny;
+                    const ty = nx;
+                    const vt = this.vx * tx + this.vy * ty;
+                    const vtDamped = vt * tanDamp;
+
+                    const vnAfter = this.vx * nx + this.vy * ny;
+                    this.vx = vnAfter * nx + vtDamped * tx;
+                    this.vy = vnAfter * ny + vtDamped * ty;
                 }
             } else if (distSq === 0) {
-                const cx = (obs.minX + obs.maxX) / 2;
-                const cy = (obs.minZ + obs.maxZ) / 2;
-                const dirX = this.px >= cx ? 1 : -1;
-                const dirY = this.py >= cy ? 1 : -1;
-                this.px += dirX * r;
-                this.py += dirY * r;
+                // Ball center inside obstacle: find minimum penetration direction out
+                const left = this.px - obs.minX;
+                const right = obs.maxX - this.px;
+                const top = this.py - obs.minZ;
+                const bottom = obs.maxZ - this.py;
+                const min = Math.min(left, right, top, bottom);
+
+                if (min === left) {
+                    this.px = obs.minX - r;
+                    if (this.vx > 0) this.vx = 0;
+                } else if (min === right) {
+                    this.px = obs.maxX + r;
+                    if (this.vx < 0) this.vx = 0;
+                } else if (min === top) {
+                    this.py = obs.minZ - r;
+                    if (this.vy > 0) this.vy = 0;
+                } else {
+                    this.py = obs.maxZ + r;
+                    if (this.vy < 0) this.vy = 0;
+                }
             }
         }
     }
@@ -146,6 +210,14 @@ export class CollisionSystem {
     getSpeed() { return Math.sqrt(this.vx * this.vx + this.vy * this.vy); }
     
     dispose() {
+        if (this._speedBoostTimer) {
+            clearTimeout(this._speedBoostTimer);
+            this._speedBoostTimer = null;
+        }
+        if (this._unsubSpeed) {
+            this._unsubSpeed();
+            this._unsubSpeed = null;
+        }
         this._obstacles = [];
         this.active = false;
     }

@@ -72,6 +72,61 @@ export class StageBriefing {
     });
   }
 
+  showRespawnCountdown(startingCount = 9) {
+    if (!this._el) return;
+
+    const badgeEl = this._el.querySelector('#sb-badge');
+    const objEl = this._el.querySelector('#sb-objective');
+    const hintEl = this._el.querySelector('#sb-hint');
+
+    if (badgeEl) {
+      badgeEl.innerText = '⚡ WZNOWIENIE GRY';
+      badgeEl.style.color = '#ffcc00';
+      badgeEl.style.borderColor = 'rgba(255, 204, 0, 0.5)';
+      badgeEl.style.background = 'rgba(255, 204, 0, 0.15)';
+    }
+
+    if (objEl) {
+      objEl.innerHTML = `START ZA: <span id="sb-count-num" style="font-size:28px; font-weight:900; color:#ffcc00; text-shadow:0 0 16px rgba(255,204,0,0.8);">${startingCount}</span>s`;
+    }
+
+    if (hintEl) {
+      hintEl.innerText = 'Wskaż kafelek kliknięciem lub bila wystawi się automatycznie w pozycji kursora!';
+    }
+
+    this._el.style.display = 'flex';
+    this._visible = true;
+
+    anime({
+      targets: this._el,
+      opacity: [0, 1],
+      translateY: [-20, 0],
+      duration: 350,
+      easing: 'easeOutQuad'
+    });
+  }
+
+  updateCountdown(seconds) {
+    if (!this._el) return;
+    const numEl = this._el.querySelector('#sb-count-num');
+    if (numEl) {
+      numEl.innerText = String(seconds);
+      if (seconds <= 3) {
+        numEl.style.color = '#ff3b30';
+        numEl.style.textShadow = '0 0 18px rgba(255,59,48,0.9)';
+      } else {
+        numEl.style.color = '#ffcc00';
+        numEl.style.textShadow = '0 0 16px rgba(255,204,0,0.8)';
+      }
+      anime({
+        targets: numEl,
+        scale: [1.35, 1.0],
+        duration: 220,
+        easing: 'easeOutBack'
+      });
+    }
+  }
+
   hide() {
     if (!this._el || !this._visible) return;
     this._visible = false;

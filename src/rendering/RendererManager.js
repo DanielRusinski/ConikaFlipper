@@ -31,11 +31,8 @@ export class RendererManager {
             'AgXToneMapping': THREE.AgXToneMapping
         };
         
-        this.renderer.toneMapping = toneMappingMap[GRAPHICS_CONFIG.toneMapping] !== undefined 
-            ? toneMappingMap[GRAPHICS_CONFIG.toneMapping] 
-            : THREE.ACESFilmicToneMapping;
-            
-        this.renderer.toneMappingExposure = GRAPHICS_CONFIG.toneMappingExposure || 1.0;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = GRAPHICS_CONFIG.toneMappingExposure || 1.2;
         
         const defaultPreset = LIGHTING_CONFIG.presets[LIGHTING_CONFIG.defaultPreset];
         if (defaultPreset && defaultPreset.background) {

@@ -114,7 +114,7 @@ export const GRAPHICS_CONFIG = {
   pixelRatioCap: isMobile ? 0.82 : 2.0,
   quality: PERFORMANCE_CONFIG.levels,
   toneMapping: 'ACESFilmic',
-  toneMappingExposure: 1.0,
+  toneMappingExposure: 1.2,
   fps: { target: 60, budgetMs: 16.67, minSustained: 50 },
   adaptiveQuality: {
     enabled: true,
@@ -123,8 +123,8 @@ export const GRAPHICS_CONFIG = {
     decreaseFrames: 15,
     increaseFrames: 150
   },
-  fog: { enabled: true, color: 0x1a1a2e, near: 1.5, far: 4.0 },
-  transition: { duration: 800 },
+  fog: { enabled: true, color: 0x1a1a2e, near: 0.8, far: 2.3 },
+  transition: { duration: 2600 },
   saturation: 1.0
 };
 

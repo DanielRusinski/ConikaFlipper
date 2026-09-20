@@ -424,6 +424,10 @@ export class BombSystem {
         // Notify systems (e.g., enemies) of detonation blast
         eventBus.emit('bomb:detonated', { x: targetX, z: targetZ, radius: blastRadius });
 
+        // Chromatic aberration flash and camera shake for punchy explosion feel
+        eventBus.emit('fx:chromaticAberration', { intensity: 0.022, duration: 0.45 });
+        eventBus.emit('fx:shake', { trauma: 0.55 });
+
         // 4. Remove bomb mesh from scene
         this._parentGroup.remove(bomb.group);
         if (bomb.ringMesh && bomb.ringMesh.material) bomb.ringMesh.material.dispose();

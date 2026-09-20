@@ -18,7 +18,6 @@ export class GameHUD {
     this._battleBtn = null;
     this._battleOrbBtn = null;
     this._pauseBtn = null;
-    this._recenterBtn = null;
     this._selectionBannerEl = null;
     this._launchBtn = null;
     this._unsubs = [];
@@ -28,10 +27,16 @@ export class GameHUD {
   init(hudContainer) {
     this._hudContainer = hudContainer;
     
-    // Create DOM structure matching responsive layout
+    // Create DOM structure matching responsive layout:
+    // Left: Time & Lives directly above Score, followed by Tiles Left, Coins restored to original position, and Active Bonuses underneath
+    // Bottom: Ball indicator (left), unobstructed Battle Orb button (center), Bomb & Pause (right)
     hudContainer.innerHTML = `
       <div id="hud-top-bar">
-        <div class="hud-scores-wrapper">
+        <div class="hud-left-column">
+          <div class="hud-status-row">
+            <div id="timer-display" class="hud-item"><span>⏱️</span><span>05:00</span></div>
+            <div id="lives-display" class="hud-item">❤️ 3</div>
+          </div>
           <div id="total-score-card" class="hud-item score-card">
             <span class="hud-title-badge">SCORE</span>
             <div id="score-display"></div>
@@ -50,16 +55,12 @@ export class GameHUD {
               <div id="red-coins-slot" class="coin-slot"></div>
             </div>
           </div>
-        </div>
-        <div class="hud-group hud-status-group">
-          <div id="timer-display" class="hud-item"><span>⏱️</span><span>05:00</span></div>
-          <div id="lives-display" class="hud-item">❤️ 3</div>
+          <div id="active-modifier" class="hud-active-modifier"></div>
         </div>
       </div>
 
       <div id="hud-bottom-bar">
         <button id="ball-indicator" class="hud-ball-btn" type="button" title="Current Ball (Tap to customize)" aria-label="Change Ball"></button>
-        <div id="active-modifier"></div>
 
         <!-- Central circular semi-transparent Battle/Equipment Orb button -->
         <button id="battle-orb-btn" class="battle-orb-btn" type="button" title="⚡ Opcje i Ekwipunek (Battle Menu)" aria-label="Battle Menu">
@@ -70,9 +71,7 @@ export class GameHUD {
         </button>
 
         <div style="display:flex; gap:10px; pointer-events:auto; align-items:center;">
-          <button id="fullscreen-btn" class="hud-touch-btn" type="button" style="display:none; pointer-events:auto; background:linear-gradient(180deg, rgba(20, 36, 60, 0.92), rgba(10, 18, 36, 0.96)); border:1.5px solid rgba(0, 229, 255, 0.5); border-radius:12px; padding:8px 12px; color:#00e5ff; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 229, 255, 0.2); align-items:center; gap:5px;" title="Pełny ekran i blokada orientacji pionowej">📱 Pion</button>
           <button id="bomb-action-btn" class="hud-touch-btn bomb-hud-btn" type="button" style="display:none; pointer-events:auto; background:linear-gradient(180deg, rgba(50, 18, 18, 0.94), rgba(28, 8, 8, 0.98)); border:1.5px solid rgba(255, 69, 58, 0.7); border-radius:12px; padding:8px 16px; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 14px rgba(255, 69, 58, 0.35); align-items:center; gap:6px;">💣 <span id="bomb-btn-count">0</span></button>
-          <button id="recenter-btn" class="hud-touch-btn" type="button" style="display:none; pointer-events:auto; background:linear-gradient(180deg, rgba(20, 36, 60, 0.92), rgba(10, 18, 36, 0.96)); border:1.5px solid rgba(0, 229, 255, 0.5); border-radius:12px; padding:8px 14px; color:#00e5ff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 229, 255, 0.2); align-items:center; gap:5px;" title="Wyzeruj poziom stołu">🎯 Poziom</button>
           <button id="pause-btn" class="hud-touch-btn" type="button" style="pointer-events:auto; background:linear-gradient(180deg, rgba(26, 36, 62, 0.92), rgba(13, 19, 36, 0.96)); border:1.5px solid rgba(120, 180, 255, 0.45); border-radius:12px; padding:8px 16px; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 180, 255, 0.2); display:inline-flex; align-items:center; gap:6px;">⏸️ Pause</button>
         </div>
       </div>
@@ -98,8 +97,6 @@ export class GameHUD {
     this._modifierEl = document.getElementById('active-modifier');
     this._bombBtn = document.getElementById('bomb-action-btn');
     this._bombCountSpan = document.getElementById('bomb-btn-count');
-    this._fullscreenBtn = document.getElementById('fullscreen-btn');
-    this._recenterBtn = document.getElementById('recenter-btn');
     this._battleOrbBtn = document.getElementById('battle-orb-btn');
     this._pauseBtn = document.getElementById('pause-btn');
 
@@ -136,48 +133,11 @@ export class GameHUD {
       eventBus.emit('ui:equipmentRequested');
     });
 
-    if (this._fullscreenBtn) {
-      attachButtonTrigger(this._fullscreenBtn, async () => {
-        await inputManager.requestFullscreenAndLock();
-        const origHtml = this._fullscreenBtn.innerHTML;
-        this._fullscreenBtn.innerHTML = '✓ Pion OK!';
-        this._fullscreenBtn.style.borderColor = '#00ffcc';
-        setTimeout(() => {
-          if (this._fullscreenBtn) {
-            this._fullscreenBtn.innerHTML = origHtml;
-            this._fullscreenBtn.style.borderColor = 'rgba(0, 229, 255, 0.5)';
-          }
-        }, 1000);
-      });
-    }
-
-    if (this._recenterBtn) {
-      attachButtonTrigger(this._recenterBtn, async () => {
-        inputManager.calibrate();
-        await inputManager.requestFullscreenAndLock();
-        const origHtml = this._recenterBtn.innerHTML;
-        this._recenterBtn.innerHTML = '✓ Poziom OK!';
-        this._recenterBtn.style.borderColor = '#00ffcc';
-        setTimeout(() => {
-          if (this._recenterBtn) {
-            this._recenterBtn.innerHTML = origHtml;
-            this._recenterBtn.style.borderColor = 'rgba(0, 229, 255, 0.5)';
-          }
-        }, 1000);
-      });
-    }
-
     const landscapeLockBtn = document.getElementById('landscape-lock-btn');
     if (landscapeLockBtn) {
       attachButtonTrigger(landscapeLockBtn, async () => {
         await inputManager.requestFullscreenAndLock();
       });
-    }
-
-    const isTouchOrMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches);
-    if (isTouchOrMobile || inputManager.isGyroActive) {
-      if (this._recenterBtn) this._recenterBtn.style.display = 'inline-flex';
-      if (this._fullscreenBtn) this._fullscreenBtn.style.display = 'inline-flex';
     }
 
     if (this._bombBtn) {
@@ -187,14 +147,6 @@ export class GameHUD {
     }
 
     this._unsubs.push(
-      eventBus.on('input:gyroActive', () => {
-        if (this._recenterBtn) {
-          this._recenterBtn.style.display = 'inline-flex';
-        }
-        if (this._fullscreenBtn) {
-          this._fullscreenBtn.style.display = 'inline-flex';
-        }
-      }),
       eventBus.on('score:changed', (data) => {
         this._scoreDisplay.setValue(data.score || 0);
         if (data.yellowScore !== undefined) {

@@ -133,59 +133,53 @@ export class LaserHazardSystem {
   }
 
   /**
-   * Constructs a 3D non-flat red laser block ("czerwony klocek")
-   * Continuously visible on the board.
+   * Constructs a hovering red laser emitter sphere ("kulka czerwona unosząca się nad kafelkiem bez bazy").
+   * Free-floating in the air with no base, continuously visible and levitating above the tile.
    */
   _createRedLaserBlock() {
     const block = new THREE.Group();
     block.name = 'RedLaserBlock';
 
-    // 1. Stepped red metallic block base (czerwony klocek)
-    const baseGeo = new THREE.BoxGeometry(0.024, 0.020, 0.024);
-    const redMat = new THREE.MeshStandardMaterial({
-      color: 0xbb1122,
-      emissive: 0x440508,
-      emissiveIntensity: 0.4,
-      metalness: 0.75,
-      roughness: 0.25
-    });
-    const baseMesh = new THREE.Mesh(baseGeo, redMat);
-    baseMesh.position.y = 0.010;
-    baseMesh.castShadow = true;
-    baseMesh.receiveShadow = true;
-    block.add(baseMesh);
-
-    // 2. Dark metallic collar / reinforcement band
-    const collarGeo = new THREE.BoxGeometry(0.025, 0.005, 0.025);
-    const collarMat = new THREE.MeshStandardMaterial({
-      color: 0x242832,
-      metalness: 0.9,
-      roughness: 0.2
-    });
-    const collarMesh = new THREE.Mesh(collarGeo, collarMat);
-    collarMesh.position.y = 0.018;
-    collarMesh.castShadow = true;
-    block.add(collarMesh);
-
-    // 3. Glowing red crystalline emitter cap / lens exactly at beamElevation (0.024)
-    const capGeo = new THREE.SphereGeometry(0.008, 16, 16);
+    // 1. Glowing red floating sphere emitter ("kulka czerwona unosząca się nad kafelkiem")
+    const sphereGeo = new THREE.SphereGeometry(0.009, 24, 24);
     const emitterMat = new THREE.MeshStandardMaterial({
       color: 0xff0033,
       emissive: new THREE.Color(0xff0033),
-      emissiveIntensity: 1.0,
-      roughness: 0.1,
-      metalness: 0.2
+      emissiveIntensity: 1.2,
+      roughness: 0.15,
+      metalness: 0.35
     });
-    const capMesh = new THREE.Mesh(capGeo, emitterMat);
-    capMesh.position.y = 0.024;
-    capMesh.name = 'BlockEmitter';
-    block.add(capMesh);
+    const sphereMesh = new THREE.Mesh(sphereGeo, emitterMat);
+    sphereMesh.position.y = 0.024;
+    sphereMesh.name = 'BlockEmitter';
+    sphereMesh.castShadow = true;
+    block.add(sphereMesh);
 
-    // 4. Point light for dynamic local casting on the table
-    const light = new THREE.PointLight(0xff0033, 0.35, 0.30);
+    // 2. Subtle floating equatorial energy ring around the sphere
+    const ringGeo = new THREE.TorusGeometry(0.0125, 0.0009, 8, 24);
+    ringGeo.rotateX(Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xff0044,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending
+    });
+    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+    ringMesh.position.y = 0.024;
+    ringMesh.name = 'BlockRing';
+    block.add(ringMesh);
+
+    // 3. Point light hovering with the sphere and casting dynamic red glow on the tile below
+    const light = new THREE.PointLight(0xff0033, 0.45, 0.32);
     light.position.y = 0.024;
     light.name = 'BlockLight';
     block.add(light);
+
+    // Metadata for organic levitation / hovering physics
+    block.userData = {
+      baseY: 0.024,
+      phaseOffset: Math.random() * Math.PI * 2
+    };
 
     // Always visible
     block.visible = true;
@@ -426,6 +420,9 @@ export class LaserHazardSystem {
 
     this._timer += gameplayDelta;
 
+    // Hover animation for the base-less red floating spheres
+    this._updateHoveringSpheres(gameplayDelta);
+
     const corridor = this._corridors[this._activeCorridorIndex];
 
     switch (this.state) {
@@ -551,6 +548,37 @@ export class LaserHazardSystem {
     if (!corridor) return;
     this._setBlockIntensity(corridor.blockA, intensity);
     this._setBlockIntensity(corridor.blockB, intensity);
+  }
+
+  _updateHoveringSpheres(dt) {
+    const isFiring = (this.state === 'FIRING');
+    for (const corr of this._corridors) {
+      this._updateSingleHoverSphere(corr.blockA, dt, isFiring);
+      this._updateSingleHoverSphere(corr.blockB, dt, isFiring);
+    }
+  }
+
+  _updateSingleHoverSphere(block, dt, isFiring) {
+    if (!block || !block.userData) return;
+    const u = block.userData;
+    u.phaseOffset = (u.phaseOffset || 0) + dt * 2.8;
+
+    // Hover bobbing: delicate floating oscillation when idle/warning, intense tremor when firing
+    const hoverOffset = isFiring
+      ? (Math.random() - 0.5) * 0.0008
+      : Math.sin(u.phaseOffset) * 0.0016;
+
+    const currY = (u.baseY || 0.024) + hoverOffset;
+    const emitter = block.getObjectByName('BlockEmitter');
+    const ring = block.getObjectByName('BlockRing');
+    const light = block.getObjectByName('BlockLight');
+
+    if (emitter) emitter.position.y = currY;
+    if (ring) {
+      ring.position.y = currY;
+      ring.rotation.z += dt * 1.5;
+    }
+    if (light) light.position.y = currY;
   }
 
   _setBlockIntensity(block, intensity) {
