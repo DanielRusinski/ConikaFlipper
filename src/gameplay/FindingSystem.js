@@ -2,9 +2,6 @@ import * as THREE from 'three';
 import { REWARD_CONFIG } from '../config/rewardConfig.js';
 import { eventBus } from '../core/EventBus.js';
 import { timeManager } from '../core/TimeManager.js';
-import { createCrystalMaterial, createBrightBloomCrystalMaterial, createEmeraldCrystalMaterial } from '../materials/environmentMaterials.js';
-import { createChargingCrystalMaterial } from '../materials/chargingCrystalMaterial.js';
-import { CircularLoadingRingManager } from '../rendering/CircularLoadingRing.js';
 import { playSound } from '../soundfx.js';
 
 export class FindingSystem {
@@ -12,27 +9,25 @@ export class FindingSystem {
     this._findings = new Map();
     this._group = new THREE.Group();
     this._group.name = 'FindingSystemGroup';
-    
-    // Pools for Tetrahedron (cards: 1-3), Amber Octahedron (points: 10-60), and Emerald Octahedron (life: 1-2)
-    this._tetraPool = [];
-    this._octaPool = [];
-    this._emeraldPool = [];
-    this._tetraPoolSize = 10;
-    this._octaPoolSize = 65; // Supports up to 60 point crystals on the board
-    this._emeraldPoolSize = 10;
+
+    // Total number of all crystal types combined (active and inactive total): exactly 15
+    this.TOTAL_CRYSTALS = 15;
+    this._slots = [];
     this._nextId = 0;
     this._tilesDiscoveredCount = 0;
     this._totalModifiersSpawned = 0;
     this._maxModifiersForBoard = 3;
-    
-    this._tetraGeometry = new THREE.TetrahedronGeometry(1, 0);
-    this._octaGeometry = new THREE.OctahedronGeometry(1, 0);
-    
-    this._tetraMaterial = null;
-    this._octaMaterial = null;
-    this._emeraldMaterial = null;
-    
-    this._ringManager = new CircularLoadingRingManager();
+
+    this._dummy = new THREE.Object3D();
+    this.instancedMesh = null;
+    this._octaGeometry = null;
+    this._material = null;
+
+    // Pre-allocated colors for instanced rendering
+    this._colorCard = new THREE.Color(0xff00cc);    // Neon Magenta
+    this._colorLife = new THREE.Color(0x00ff66);    // Emerald Green
+    this._colorPoints = new THREE.Color(0xffaa00);  // Amber Gold
+
     this._unsub = null;
     this._labelSystem = null;
   }
@@ -42,53 +37,101 @@ export class FindingSystem {
       parentGroup.add(this._group);
     }
     this._labelSystem = labelSystem;
-    
-    this._tetraMaterial = createBrightBloomCrystalMaterial(0xff00cc);
-    this._octaMaterial = createBrightBloomCrystalMaterial(0xffaa00);
-    this._emeraldMaterial = createBrightBloomCrystalMaterial(0x00ff66);
 
-    // Pre-create Tetrahedron meshes (cards)
-    for (let i = 0; i < this._tetraPoolSize; i++) {
-      const mesh = new THREE.Mesh(this._tetraGeometry, this._tetraMaterial);
-      mesh.visible = false;
-      mesh.castShadow = false; // Emissive crystals don't need heavy shadow casting
-      this._group.add(mesh);
-      this._tetraPool.push(mesh);
+    // Diamond / gem octahedron geometry shared across all 15 crystal instances
+    this._octaGeometry = new THREE.OctahedronGeometry(1, 0);
+
+    // Glowing crystal material that multiplies instance color into emissive for Bloom
+    this._material = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.15,
+      metalness: 0.25,
+      transparent: true,
+      opacity: 0.95
+    });
+
+    this._material.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <emissivemap_fragment>',
+        `
+        #include <emissivemap_fragment>
+        #ifdef USE_INSTANCING_COLOR
+          totalEmissiveRadiance += vInstanceColor.rgb * 2.5;
+        #endif
+        `
+      );
+    };
+
+    // Single InstancedMesh for ALL crystals (draws all 15 crystals in a single draw call!)
+    this.instancedMesh = new THREE.InstancedMesh(this._octaGeometry, this._material, this.TOTAL_CRYSTALS);
+    this.instancedMesh.name = 'FindingSystemInstancedMesh';
+    this.instancedMesh.castShadow = false; // Disabled for mobile performance
+    this.instancedMesh.receiveShadow = false;
+    this.instancedMesh.frustumCulled = false;
+    this.instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    if (this.instancedMesh.instanceColor) {
+      this.instancedMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
     }
 
-    // Pre-create Amber Octahedron meshes (points: up to 60)
-    for (let i = 0; i < this._octaPoolSize; i++) {
-      const mesh = new THREE.Mesh(this._octaGeometry, this._octaMaterial);
-      mesh.visible = false;
-      mesh.castShadow = false; // Disabled for mobile performance
-      this._group.add(mesh);
-      this._octaPool.push(mesh);
+    // Pre-allocate 15 slots and anchor dummy objects for CSS2D labels
+    this._slots = [];
+    for (let i = 0; i < this.TOTAL_CRYSTALS; i++) {
+      const anchorObject = new THREE.Object3D();
+      anchorObject.name = `CrystalAnchor_${i}`;
+      anchorObject.visible = false;
+      this._group.add(anchorObject);
+
+      this._slots.push({
+        index: i,
+        active: false,
+        id: i,
+        type: 'points_crystal',
+        tileIndex: -1,
+        gridX: 0,
+        gridY: 0,
+        baseX: 0,
+        baseZ: 0,
+        baseY: 0.042,
+        scale: 0.016,
+        rotationX: 0,
+        rotationY: 0,
+        rotationSpeed: 2.0,
+        timeOffset: Math.random() * Math.PI * 2,
+        amplitude: 0.008,
+        color: this._colorPoints,
+        labelText: '+250💎',
+        labelClass: 'crystal-countdown points ready',
+        anchorObject,
+        labelId: null,
+        value: 250
+      });
+
+      // Initially scale to 0 far below table
+      this._dummy.position.set(0, -999, 0);
+      this._dummy.scale.set(0, 0, 0);
+      this._dummy.updateMatrix();
+      this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
+      this.instancedMesh.setColorAt(i, this._colorPoints);
     }
 
-    // Pre-create Emerald Green Octahedron meshes (life)
-    for (let i = 0; i < this._emeraldPoolSize; i++) {
-      const mesh = new THREE.Mesh(this._octaGeometry, this._emeraldMaterial);
-      mesh.visible = false;
-      mesh.castShadow = false;
-      this._group.add(mesh);
-      this._emeraldPool.push(mesh);
+    this.instancedMesh.instanceMatrix.needsUpdate = true;
+    if (this.instancedMesh.instanceColor) {
+      this.instancedMesh.instanceColor.needsUpdate = true;
     }
 
+    this._group.add(this.instancedMesh);
     this._unsub = eventBus.on('tile:discovered', this._onTileDiscovered.bind(this));
   }
 
   setLabelSystem(labelSystem) {
     this._labelSystem = labelSystem;
-    // Attach labels to any active ready crystals if labelSystem was attached after spawn
     if (this._labelSystem) {
-      for (const finding of this._findings.values()) {
-        if (finding.active && finding.mesh.userData.state === 'ready' && !finding.mesh.userData.labelId) {
-          const type = finding.type;
-          const text = (type === 'emerald_crystal') ? '+1❤️' : ((type === 'points_crystal') ? '+250💎' : '🃏');
-          const className = (type === 'emerald_crystal') ? 'crystal-countdown emerald ready' : ((type === 'points_crystal') ? 'crystal-countdown points ready' : 'crystal-countdown ready');
-          finding.mesh.userData.labelId = this._labelSystem.createLabel(finding.mesh, {
-            text,
-            className,
+      for (let i = 0; i < this.TOTAL_CRYSTALS; i++) {
+        const slot = this._slots[i];
+        if (slot.active && slot.labelId === null) {
+          slot.labelId = this._labelSystem.createLabel(slot.anchorObject, {
+            text: slot.labelText,
+            className: slot.labelClass,
             worldOffset: { x: 0, y: 0.038, z: 0 }
           });
         }
@@ -97,16 +140,17 @@ export class FindingSystem {
   }
 
   /**
-   * Randomly scatters crystals across all playable/occupiable tiles on the board.
-   * Specific quantities:
-   * - 1 - 3 Card Crystals ('modifier')
-   * - 1 - 2 Life Crystals ('emerald_crystal')
-   * - 10 - 60 Points Crystals ('points_crystal')
+   * Randomly scatters crystals as InstancedMesh instances across all playable tiles on the board.
+   * Total number of all crystal types combined is exactly 15:
+   * - 1 - 3 Card Crystals ('modifier', 🃏)
+   * - 1 - 2 Life Crystals ('emerald_crystal', +1❤️)
+   * - 10 - 13 Points Crystals ('points_crystal', +250💎)
+   * Total: countCards + countLife + countPoints = 15!
    *
    * @param {Object} tileManager
    */
   spawnBoardCrystals(tileManager) {
-    if (!tileManager) return;
+    if (!tileManager || !this.instancedMesh) return;
 
     // Clean reset any existing findings before spawning new board crystals
     this.reset();
@@ -129,7 +173,7 @@ export class FindingSystem {
 
     if (availableTiles.length === 0) return;
 
-    // Fisher-Yates shuffle
+    // Fisher-Yates shuffle available tiles
     for (let i = availableTiles.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       const temp = availableTiles[i];
@@ -137,257 +181,232 @@ export class FindingSystem {
       availableTiles[j] = temp;
     }
 
-    // Exact quantities requested:
-    // 1 - 3 card crystals
-    const countCards = Math.floor(Math.random() * 3) + 1;
-    // 1 - 2 life crystals
-    const countLife = Math.floor(Math.random() * 2) + 1;
-    // 10 - 60 points crystals
-    const countPoints = Math.floor(Math.random() * 51) + 10;
+    // Exact proportions summing to exactly 15 instances:
+    const countCards = Math.floor(Math.random() * 3) + 1; // 1 to 3
+    const countLife = Math.floor(Math.random() * 2) + 1;   // 1 to 2
+    const countPoints = this.TOTAL_CRYSTALS - countCards - countLife; // 10 to 13 (sum = 15)
 
-    let tileIdx = 0;
+    let slotIdx = 0;
 
-    // 1. Spawn Card Crystals (1 - 3)
-    for (let c = 0; c < countCards && tileIdx < availableTiles.length; c++, tileIdx++) {
-      const tile = availableTiles[tileIdx];
+    // Helper to configure a slot in the InstancedMesh
+    const configureSlot = (type, color, value, radius, labelText, labelClass, rotSpeed) => {
+      if (slotIdx >= this.TOTAL_CRYSTALS || slotIdx >= availableTiles.length) return;
+      const tile = availableTiles[slotIdx];
       const worldPos = tileManager.getTileWorldPos(tile.gridX, tile.gridY);
       const index = tileManager.getTileIndex(tile.gridX, tile.gridY);
-      this._spawnFinding(worldPos.x, worldPos.z, index, 'modifier', true, Infinity);
+      const slot = this._slots[slotIdx];
+
+      slot.active = true;
+      slot.id = this._nextId++;
+      slot.type = type;
+      slot.tileIndex = index;
+      slot.gridX = tile.gridX;
+      slot.gridY = tile.gridY;
+      slot.baseX = worldPos.x;
+      slot.baseZ = worldPos.z;
+      slot.baseY = 0.042;
+      slot.scale = radius;
+      slot.rotationX = 0;
+      slot.rotationY = Math.random() * Math.PI * 2;
+      slot.rotationSpeed = rotSpeed;
+      slot.timeOffset = Math.random() * Math.PI * 2;
+      slot.amplitude = 0.008;
+      slot.color = color;
+      slot.value = value;
+      slot.labelText = labelText;
+      slot.labelClass = labelClass;
+
+      // Position anchor object for CSS2D labels
+      slot.anchorObject.position.set(worldPos.x, slot.baseY, worldPos.z);
+      slot.anchorObject.visible = true;
+
+      if (this._labelSystem) {
+        slot.labelId = this._labelSystem.createLabel(slot.anchorObject, {
+          text: labelText,
+          className: labelClass,
+          worldOffset: { x: 0, y: 0.038, z: 0 }
+        });
+      }
+
+      // Update instance color & transform in InstancedMesh
+      this.instancedMesh.setColorAt(slotIdx, color);
+      this._dummy.position.set(worldPos.x, slot.baseY, worldPos.z);
+      this._dummy.rotation.set(0, slot.rotationY, 0);
+      this._dummy.scale.set(radius, radius, radius);
+      this._dummy.updateMatrix();
+      this.instancedMesh.setMatrixAt(slotIdx, this._dummy.matrix);
+
+      // Backwards-compatible finding map entry
+      const findingData = {
+        id: slot.id,
+        slotIndex: slotIdx,
+        type,
+        value,
+        tileIndex: index,
+        active: true,
+        expiresAt: Infinity,
+        mesh: {
+          position: slot.anchorObject.position,
+          visible: true,
+          userData: { state: 'ready', bloomReady: true }
+        }
+      };
+      this._findings.set(slot.id, findingData);
+      eventBus.emit(type === 'modifier' ? 'modifier:spawned' : 'finding:spawned', { id: slot.id, tileIndex: index, type });
+
+      slotIdx++;
+    };
+
+    // 1. Configure Card Crystals (1 - 3)
+    for (let c = 0; c < countCards; c++) {
+      configureSlot('modifier', this._colorCard, 100, 0.015, '🃏', 'crystal-countdown ready', 1.6);
     }
 
-    // 2. Spawn Life Crystals (1 - 2)
-    for (let l = 0; l < countLife && tileIdx < availableTiles.length; l++, tileIdx++) {
-      const tile = availableTiles[tileIdx];
-      const worldPos = tileManager.getTileWorldPos(tile.gridX, tile.gridY);
-      const index = tileManager.getTileIndex(tile.gridX, tile.gridY);
-      this._spawnFinding(worldPos.x, worldPos.z, index, 'emerald_crystal', true, Infinity);
+    // 2. Configure Life Crystals (1 - 2)
+    for (let l = 0; l < countLife; l++) {
+      configureSlot('emerald_crystal', this._colorLife, 200, 0.016, '+1❤️', 'crystal-countdown emerald ready', 2.0);
     }
 
-    // 3. Spawn Points Crystals (10 - 60)
-    for (let p = 0; p < countPoints && tileIdx < availableTiles.length; p++, tileIdx++) {
-      const tile = availableTiles[tileIdx];
-      const worldPos = tileManager.getTileWorldPos(tile.gridX, tile.gridY);
-      const index = tileManager.getTileIndex(tile.gridX, tile.gridY);
-      this._spawnFinding(worldPos.x, worldPos.z, index, 'points_crystal', true, Infinity);
+    // 3. Configure Points Crystals (remaining slots, 10 - 13)
+    for (let p = 0; p < countPoints; p++) {
+      configureSlot('points_crystal', this._colorPoints, 250, 0.016, '+250💎', 'crystal-countdown points ready', 2.0);
+    }
+
+    // Hide any unused slots (if available tiles was somehow < 15)
+    while (slotIdx < this.TOTAL_CRYSTALS) {
+      const slot = this._slots[slotIdx];
+      slot.active = false;
+      slot.anchorObject.visible = false;
+      this._dummy.position.set(0, -999, 0);
+      this._dummy.scale.set(0, 0, 0);
+      this._dummy.updateMatrix();
+      this.instancedMesh.setMatrixAt(slotIdx, this._dummy.matrix);
+      slotIdx++;
+    }
+
+    this.instancedMesh.instanceMatrix.needsUpdate = true;
+    if (this.instancedMesh.instanceColor) {
+      this.instancedMesh.instanceColor.needsUpdate = true;
     }
   }
 
   _onTileDiscovered({ tileIndex, x, z, gridX, gridY }) {
     this._tilesDiscoveredCount = (this._tilesDiscoveredCount || 0) + 1;
     // Discovery spawning disabled: crystals are pre-populated on the board at stage start
-    // in exact counts (1-3 cards, 1-2 life, 10-60 points) to prevent excessive crystal clutter.
+    // in exact total count of 15 instances to maintain 60 FPS on mobile devices.
   }
 
-  _spawnFinding(worldX, worldZ, tileIndex, type, readyImmediately = false, expiresAt = Infinity) {
+  /**
+   * Backwards-compatible single finding spawn (activates first available inactive slot in InstancedMesh)
+   */
+  _spawnFinding(worldX, worldZ, tileIndex, type, readyImmediately = true, expiresAt = Infinity) {
+    if (!this.instancedMesh) return;
+    const slotIdx = this._slots.findIndex(s => !s.active);
+    if (slotIdx === -1) return; // Pool full (all 15 instances active)
+
+    const slot = this._slots[slotIdx];
     const isModifier = (type === 'modifier');
-    if (isModifier) {
-      this._totalModifiersSpawned++;
-    }
-    let pool;
-    if (type === 'modifier') pool = this._tetraPool;
-    else if (type === 'points_crystal') pool = this._octaPool;
-    else pool = this._emeraldPool;
-
-    if (!pool || pool.length === 0) return;
-
-    const mesh = pool.pop();
+    const color = isModifier ? this._colorCard : (type === 'emerald_crystal' ? this._colorLife : this._colorPoints);
     const radius = isModifier ? 0.015 : 0.016;
-    
-    // Animation & lifecycle state
-    mesh.userData.baseY = 0.042;
-    mesh.userData.targetScale = radius;
-    mesh.userData.amplitude = 0.008;
-    mesh.userData.rotationSpeed = isModifier ? 1.6 : 2.0;
-    mesh.userData.timeOffset = Math.random() * Math.PI * 2;
-    mesh.userData.crystalType = type;
+    const labelText = isModifier ? '🃏' : (type === 'emerald_crystal' ? '+1❤️' : '+250💎');
+    const labelClass = isModifier ? 'crystal-countdown ready' : (type === 'emerald_crystal' ? 'crystal-countdown emerald ready' : 'crystal-countdown points ready');
+    const value = isModifier ? 100 : (type === 'emerald_crystal' ? 200 : 250);
 
-    const id = this._nextId++;
+    slot.active = true;
+    slot.id = this._nextId++;
+    slot.type = type;
+    slot.tileIndex = tileIndex;
+    slot.baseX = worldX;
+    slot.baseZ = worldZ;
+    slot.baseY = 0.042;
+    slot.scale = radius;
+    slot.rotationX = 0;
+    slot.rotationY = 0;
+    slot.rotationSpeed = isModifier ? 1.6 : 2.0;
+    slot.timeOffset = Math.random() * Math.PI * 2;
+    slot.amplitude = 0.008;
+    slot.color = color;
+    slot.value = value;
+    slot.labelText = labelText;
+    slot.labelClass = labelClass;
 
-    if (readyImmediately) {
-      mesh.position.set(worldX, mesh.userData.baseY, worldZ);
-      mesh.scale.set(radius, radius, radius);
-      mesh.visible = true;
-      mesh.userData.popping = false;
-      mesh.userData.popProgress = 1.0;
-      mesh.userData.state = 'ready';
-      mesh.userData.bloomReady = true;
-      mesh.userData.timer = 0;
-      mesh.userData.loadingRingMesh = null;
+    slot.anchorObject.position.set(worldX, slot.baseY, worldZ);
+    slot.anchorObject.visible = true;
 
-      if (type === 'emerald_crystal') {
-        mesh.material = createBrightBloomCrystalMaterial(0x00ff66);
-        if (this._labelSystem) {
-          mesh.userData.labelId = this._labelSystem.createLabel(mesh, {
-            text: '+1❤️',
-            className: 'crystal-countdown emerald ready',
-            worldOffset: { x: 0, y: 0.038, z: 0 }
-          });
-        }
-      } else if (type === 'points_crystal') {
-        mesh.material = createBrightBloomCrystalMaterial(0xffaa00);
-        if (this._labelSystem) {
-          mesh.userData.labelId = this._labelSystem.createLabel(mesh, {
-            text: '+250💎',
-            className: 'crystal-countdown points ready',
-            worldOffset: { x: 0, y: 0.038, z: 0 }
-          });
-        }
-      } else {
-        mesh.material = createBrightBloomCrystalMaterial(0xff00cc);
-        if (this._labelSystem) {
-          mesh.userData.labelId = this._labelSystem.createLabel(mesh, {
-            text: '🃏',
-            className: 'crystal-countdown ready',
-            worldOffset: { x: 0, y: 0.038, z: 0 }
-          });
-        }
-      }
-    } else {
-      mesh.position.set(worldX, 0.005, worldZ);
-      mesh.scale.set(0.005, 0.005, 0.005);
-      mesh.visible = true;
-      mesh.userData.popping = true;
-      mesh.userData.popProgress = 0;
-      mesh.userData.bloomReady = false;
-      mesh.userData.timer = 10.0;
-      mesh.userData.lastSeconds = 10;
-      mesh.userData.state = 'charging';
+    if (this._labelSystem) {
+      slot.labelId = this._labelSystem.createLabel(slot.anchorObject, {
+        text: labelText,
+        className: labelClass,
+        worldOffset: { x: 0, y: 0.038, z: 0 }
+      });
+    }
 
-      const chargingColor = (type === 'emerald_crystal') ? 0x00ff66 : (type === 'points_crystal' ? 0xffaa00 : 0xff00cc);
-      mesh.material = createChargingCrystalMaterial(chargingColor);
+    this.instancedMesh.setColorAt(slotIdx, color);
+    this._dummy.position.set(worldX, slot.baseY, worldZ);
+    this._dummy.rotation.set(0, 0, 0);
+    this._dummy.scale.set(radius, radius, radius);
+    this._dummy.updateMatrix();
+    this.instancedMesh.setMatrixAt(slotIdx, this._dummy.matrix);
 
-      const ringMesh = this._ringManager.createRingMesh(chargingColor);
-      ringMesh.position.set(worldX, 0.003, worldZ);
-      this._group.add(ringMesh);
-      mesh.userData.loadingRingMesh = ringMesh;
-      mesh.userData.labelId = null;
-      playSound(isModifier ? 900 : (type === 'emerald_crystal' ? 1200 : 1100), 0.10);
+    this.instancedMesh.instanceMatrix.needsUpdate = true;
+    if (this.instancedMesh.instanceColor) {
+      this.instancedMesh.instanceColor.needsUpdate = true;
     }
 
     const findingData = {
-      id,
+      id: slot.id,
+      slotIndex: slotIdx,
       type,
-      value: isModifier ? 100 : (type === 'emerald_crystal' ? 200 : 250),
-      createdAt: timeManager.elapsed,
-      expiresAt: (expiresAt !== undefined && expiresAt !== null) ? expiresAt : (timeManager.elapsed + 45.0),
+      value,
       tileIndex,
-      mesh,
-      active: true
+      active: true,
+      expiresAt: (expiresAt !== undefined && expiresAt !== null) ? expiresAt : Infinity,
+      mesh: {
+        position: slot.anchorObject.position,
+        visible: true,
+        userData: { state: 'ready', bloomReady: true }
+      }
     };
-
-    this._findings.set(id, findingData);
-    eventBus.emit(isModifier ? 'modifier:spawned' : 'finding:spawned', { id, tileIndex, type });
+    this._findings.set(slot.id, findingData);
+    eventBus.emit(isModifier ? 'modifier:spawned' : 'finding:spawned', { id: slot.id, tileIndex, type });
   }
 
   update(gameplayDelta) {
+    if (!this.instancedMesh) return;
     const elapsed = timeManager.elapsed;
 
-    for (const [id, finding] of this._findings.entries()) {
-      if (!finding.active) continue;
-
-      const mesh = finding.mesh;
-      const t = elapsed;
-
-      // Pop-out spawn scale & bounce animation
-      if (mesh.userData.popping) {
-        mesh.userData.popProgress += gameplayDelta * 3.2;
-        if (mesh.userData.popProgress < 1.0) {
-          const p = mesh.userData.popProgress;
-          mesh.position.y = mesh.userData.baseY + Math.sin(p * Math.PI) * 0.04;
-          const s = Math.min(1.25 * mesh.userData.targetScale, p * mesh.userData.targetScale * 1.25);
-          mesh.scale.set(s, s, s);
-        } else {
-          mesh.userData.popping = false;
-          mesh.scale.set(mesh.userData.targetScale, mesh.userData.targetScale, mesh.userData.targetScale);
-        }
-      } else {
-        // Floating & Bobbing
-        mesh.position.y = mesh.userData.baseY + Math.sin(t * 2.2 + mesh.userData.timeOffset) * mesh.userData.amplitude;
+    for (let i = 0; i < this.TOTAL_CRYSTALS; i++) {
+      const slot = this._slots[i];
+      if (!slot.active) {
+        this._dummy.position.set(0, -999, 0);
+        this._dummy.scale.set(0, 0, 0);
+        this._dummy.updateMatrix();
+        this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
+        continue;
       }
 
       // Continuous rotation
-      mesh.rotation.y += mesh.userData.rotationSpeed * gameplayDelta;
-      mesh.rotation.x += mesh.userData.rotationSpeed * 0.45 * gameplayDelta;
+      slot.rotationY += slot.rotationSpeed * gameplayDelta;
+      slot.rotationX += slot.rotationSpeed * 0.45 * gameplayDelta;
 
-      // Countdown lifecycle handling
-      mesh.userData.timer -= gameplayDelta;
-      const progress = Math.min(1.0, Math.max(0.0, 1.0 - (mesh.userData.timer / 10.0)));
+      // Floating & Bobbing
+      const currentY = slot.baseY + Math.sin(elapsed * 2.2 + slot.timeOffset) * slot.amplitude;
+      slot.anchorObject.position.y = currentY;
 
-      if (mesh.userData.state === 'charging') {
-        // Update delicate circular loading bar
-        if (mesh.userData.loadingRingMesh) {
-          this._ringManager.updateRing(mesh.userData.loadingRingMesh, progress, t, 1.0);
-        }
-        // Update charging crystal shader uniforms
-        if (mesh.material && mesh.material.uniforms) {
-          if (mesh.material.uniforms.uTime) mesh.material.uniforms.uTime.value = t;
-          if (mesh.material.uniforms.uChargeProgress) mesh.material.uniforms.uChargeProgress.value = progress;
-        }
-      }
-
-      // Transition to bloom and ready state when 10s countdown finishes
-      if (mesh.userData.state === 'charging' && mesh.userData.timer <= 0) {
-        mesh.userData.state = 'ready';
-        mesh.userData.bloomReady = true;
-
-        // Complete & remove circular loading bar
-        if (mesh.userData.loadingRingMesh) {
-          mesh.userData.loadingRingMesh.visible = false;
-          if (mesh.userData.loadingRingMesh.parent) {
-            mesh.userData.loadingRingMesh.parent.remove(mesh.userData.loadingRingMesh);
-          }
-          mesh.userData.loadingRingMesh = null;
-        }
-
-        if (finding.type === 'emerald_crystal') {
-          mesh.material = createBrightBloomCrystalMaterial(0x00ff66);
-          if (this._labelSystem) {
-            mesh.userData.labelId = this._labelSystem.createLabel(mesh, {
-              text: '+1❤️',
-              className: 'crystal-countdown emerald ready',
-              worldOffset: { x: 0, y: 0.038, z: 0 }
-            });
-          }
-          playSound(1450, 0.25);
-        } else if (finding.type === 'points_crystal') {
-          mesh.material = createBrightBloomCrystalMaterial(0xffaa00);
-          if (this._labelSystem) {
-            mesh.userData.labelId = this._labelSystem.createLabel(mesh, {
-              text: '+250💎',
-              className: 'crystal-countdown points ready',
-              worldOffset: { x: 0, y: 0.038, z: 0 }
-            });
-          }
-          playSound(1250, 0.25);
-        } else {
-          // Card modifier
-          mesh.material = createBrightBloomCrystalMaterial(0xff00cc);
-          if (this._labelSystem) {
-            mesh.userData.labelId = this._labelSystem.createLabel(mesh, {
-              text: '🃏',
-              className: 'crystal-countdown ready',
-              worldOffset: { x: 0, y: 0.038, z: 0 }
-            });
-          }
-          playSound(1400, 0.25);
-        }
-
-        finding.expiresAt = timeManager.elapsed + 35.0; // 35s window to collect
-      }
-
-      // Emissive pulsation when ready
-      if (mesh.userData.bloomReady && mesh.material) {
-        mesh.material.emissiveIntensity = 3.0 + Math.sin(t * 6.0) * 1.2;
-      }
-
-      // Expiry check
-      if (elapsed > finding.expiresAt) {
-        this._returnToPool(finding);
-      }
+      // Update transform in InstancedMesh
+      this._dummy.position.set(slot.baseX, currentY, slot.baseZ);
+      this._dummy.rotation.set(slot.rotationX, slot.rotationY, 0);
+      this._dummy.scale.set(slot.scale, slot.scale, slot.scale);
+      this._dummy.updateMatrix();
+      this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
     }
+
+    this.instancedMesh.instanceMatrix.needsUpdate = true;
   }
 
   checkCollection(ballX, ballZ, ballRadius) {
+    if (!this.instancedMesh) return;
+
     let bx = ballX;
     let bz = ballZ;
     if (bx > 0.3 || bz > 0.6) {
@@ -395,94 +414,91 @@ export class FindingSystem {
       bz -= 1.07 / 2;
     }
 
-    for (const [id, finding] of this._findings.entries()) {
-      if (!finding.active) continue;
+    for (let i = 0; i < this.TOTAL_CRYSTALS; i++) {
+      const slot = this._slots[i];
+      if (!slot.active) continue;
 
-      // Crystals cannot be collected while still charging during the 10s countdown!
-      if (finding.mesh.userData.state !== 'ready') {
-        continue;
-      }
-
-      const dx = finding.mesh.position.x - bx;
-      const dz = finding.mesh.position.z - bz;
+      const dx = slot.baseX - bx;
+      const dz = slot.baseZ - bz;
       const distSq = dx * dx + dz * dz;
-      const crystalRadius = (finding.type === 'modifier') ? 0.016 : 0.018;
+      const crystalRadius = (slot.type === 'modifier') ? 0.016 : 0.018;
       const collectRadius = ballRadius + crystalRadius;
 
       if (distSq < collectRadius * collectRadius) {
-        if (finding.type === 'points_crystal') {
-          // Points crystal gives +250 points immediately, NO card modal
+        slot.active = false;
+        slot.anchorObject.visible = false;
+
+        if (slot.labelId !== null && this._labelSystem) {
+          this._labelSystem.removeLabel(slot.labelId);
+          slot.labelId = null;
+        }
+
+        // Instantly hide collected instance
+        this._dummy.position.set(0, -999, 0);
+        this._dummy.scale.set(0, 0, 0);
+        this._dummy.updateMatrix();
+        this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
+        this.instancedMesh.instanceMatrix.needsUpdate = true;
+
+        if (slot.type === 'points_crystal') {
           eventBus.emit('finding:collected', {
-            id: finding.id,
-            value: finding.value,
+            id: slot.id,
+            value: slot.value,
             type: 'points_crystal'
           });
           playSound(1250, 0.2);
-        } else if (finding.type === 'emerald_crystal') {
-          // Emerald crystal gives points + extra life!
+        } else if (slot.type === 'emerald_crystal') {
           eventBus.emit('finding:collected', {
-            id: finding.id,
-            value: finding.value,
+            id: slot.id,
+            value: slot.value,
             type: 'emerald_crystal',
             givesLife: true
           });
           playSound(1450, 0.25);
         } else {
-          // Card modifier crystal opens card selection
           eventBus.emit('modifier:collected', {
-            id: finding.id,
-            value: finding.value,
+            id: slot.id,
+            value: slot.value,
             type: 'modifier'
           });
           playSound(1500, 0.3);
         }
 
-        this._returnToPool(finding);
+        const finding = this._findings.get(slot.id);
+        if (finding) {
+          finding.active = false;
+          this._findings.delete(slot.id);
+        }
       }
     }
-  }
-
-  _returnToPool(finding) {
-    finding.active = false;
-    finding.mesh.visible = false;
-
-    if (finding.mesh.userData.loadingRingMesh) {
-      finding.mesh.userData.loadingRingMesh.visible = false;
-      if (finding.mesh.userData.loadingRingMesh.parent) {
-        finding.mesh.userData.loadingRingMesh.parent.remove(finding.mesh.userData.loadingRingMesh);
-      }
-      finding.mesh.userData.loadingRingMesh = null;
-    }
-
-    if (finding.mesh.userData.labelId !== null && this._labelSystem) {
-      this._labelSystem.removeLabel(finding.mesh.userData.labelId);
-      finding.mesh.userData.labelId = null;
-    }
-
-    // Return to respective pool
-    if (finding.type === 'modifier') {
-      finding.mesh.material = this._tetraMaterial;
-      this._tetraPool.push(finding.mesh);
-    } else if (finding.type === 'points_crystal') {
-      finding.mesh.material = this._octaMaterial;
-      this._octaPool.push(finding.mesh);
-    } else {
-      finding.mesh.material = this._emeraldMaterial;
-      this._emeraldPool.push(finding.mesh);
-    }
-
-    this._findings.delete(finding.id);
   }
 
   reset() {
     this._tilesDiscoveredCount = 0;
     this._totalModifiersSpawned = 0;
-    this._maxModifiersForBoard = 3;
-    // Clear and return all active findings
-    for (const finding of Array.from(this._findings.values())) {
-      this._returnToPool(finding);
-    }
     this._findings.clear();
+
+    for (let i = 0; i < this.TOTAL_CRYSTALS; i++) {
+      const slot = this._slots[i];
+      if (slot) {
+        slot.active = false;
+        slot.anchorObject.visible = false;
+        if (slot.labelId !== null && this._labelSystem) {
+          this._labelSystem.removeLabel(slot.labelId);
+          slot.labelId = null;
+        }
+      }
+      if (this.instancedMesh) {
+        this._dummy.position.set(0, -999, 0);
+        this._dummy.scale.set(0, 0, 0);
+        this._dummy.updateMatrix();
+        this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
+      }
+    }
+
+    if (this.instancedMesh) {
+      this.instancedMesh.instanceMatrix.needsUpdate = true;
+    }
   }
 
   dispose() {
@@ -492,22 +508,32 @@ export class FindingSystem {
     }
 
     this.reset();
-    this._ringManager.dispose();
 
-    this._tetraGeometry.dispose();
-    this._octaGeometry.dispose();
+    if (this._octaGeometry) {
+      this._octaGeometry.dispose();
+      this._octaGeometry = null;
+    }
 
-    if (this._tetraMaterial) this._tetraMaterial.dispose();
-    if (this._octaMaterial) this._octaMaterial.dispose();
-    if (this._emeraldMaterial) this._emeraldMaterial.dispose();
+    if (this._material) {
+      this._material.dispose();
+      this._material = null;
+    }
 
-    for (const mesh of this._tetraPool) this._group.remove(mesh);
-    for (const mesh of this._octaPool) this._group.remove(mesh);
-    for (const mesh of this._emeraldPool) this._group.remove(mesh);
+    if (this.instancedMesh) {
+      this._group.remove(this.instancedMesh);
+      this.instancedMesh.geometry.dispose();
+      if (this.instancedMesh.material && this.instancedMesh.material.dispose) {
+        this.instancedMesh.material.dispose();
+      }
+      this.instancedMesh = null;
+    }
 
-    this._tetraPool = [];
-    this._octaPool = [];
-    this._emeraldPool = [];
+    for (const slot of this._slots) {
+      if (slot.anchorObject && slot.anchorObject.parent) {
+        slot.anchorObject.parent.remove(slot.anchorObject);
+      }
+    }
+    this._slots = [];
 
     if (this._group.parent) {
       this._group.parent.remove(this._group);

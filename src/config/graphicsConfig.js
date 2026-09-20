@@ -46,12 +46,12 @@ export const GRAPHICS_CONFIG = {
   },
   toneMapping: 'ACESFilmic',
   toneMappingExposure: 1.0,
-  fps: { target: 60, budgetMs: 16.67, minSustained: 30 },
+  fps: { target: 60, budgetMs: 16.67, minSustained: 50 },
   adaptiveQuality: {
     enabled: true,
-    decreaseThreshold: 45,
+    decreaseThreshold: 50,
     increaseThreshold: 58,
-    decreaseFrames: 25,
+    decreaseFrames: 15,
     increaseFrames: 150
   },
   fog: { enabled: true, color: 0x1a1a2e, near: 1.5, far: 4.0 },
