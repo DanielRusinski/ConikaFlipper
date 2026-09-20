@@ -6,7 +6,7 @@ Gra arcade w duchu starych gier pinball/flipper.
 
 ## Prawa autorskie i licencja / Copyright and License
 
-**© 2026 Daniel Rusinski (DanRus) & Zosia Korzeniowska.**
+**© 2026 Daniel Rusinski (DanRus)**
 **Wszystkie prawa zastrzeżone. / All rights reserved.**
 
 ### PL | Ostrzeżenie prawne
