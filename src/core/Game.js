@@ -247,7 +247,7 @@ export class Game {
         this.labelSystem = new LabelSystem();
         this.labelSystem.init(labelContainer, this.scene);
         this.findingSystem.setLabelSystem(this.labelSystem);
-        this.findingSystem.spawnBoardCrystals(this.tileManager);
+        this.findingSystem.setupBoardCrystals(this.tileManager);
 
         this.stageBriefing = new StageBriefing();
         this.stageBriefing.init(uiOverlay);
@@ -579,8 +579,8 @@ export class Game {
         const gameplayDelta = timeManager.gameplayDelta;
         const elapsed = timeManager.elapsed;
 
-        // Adaptive quality
-        qualityManager.update(performanceManager.fps);
+        // Adaptive quality (evaluates rolling average FPS, frame time, and WebGL metrics)
+        qualityManager.update(performanceManager.fps, delta, this.renderer ? this.renderer.info : null);
 
         const isPlaying = gameStateManager.is(GAME_STATES.PLAYING);
         const isSlowMo = gameStateManager.is(GAME_STATES.SLOW_MOTION_MENU);
@@ -822,6 +822,10 @@ export class Game {
         shaderManager.updateAllTime(elapsed);
 
         // Render
+        if (this.shadowSystem) {
+            this.shadowSystem.update(this.renderer);
+        }
+
         if (this.transitionManager.isTransitioning()) {
             this.transitionManager.render(this.renderer);
         } else {
@@ -848,7 +852,7 @@ export class Game {
 
         // Full clean reset of crystals, labels, and particle trails
         this.findingSystem.reset();
-        this.findingSystem.spawnBoardCrystals(this.tileManager);
+        this.findingSystem.setupBoardCrystals(this.tileManager);
 
         // Full clean reset of laser hazard
         if (this.laserHazardSystem) {
@@ -1190,7 +1194,7 @@ export class Game {
 
         if (this.findingSystem) {
             this.findingSystem.reset();
-            this.findingSystem.spawnBoardCrystals(this.tileManager);
+            this.findingSystem.setupBoardCrystals(this.tileManager);
         }
     }
 

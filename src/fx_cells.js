@@ -7,15 +7,19 @@ import {
   AdditiveBlending,
   DynamicDrawUsage
 } from 'three';
+import { eventBus } from './core/EventBus.js';
 
 export const cellParticles = {
   group: null,
   instancedMesh: null,
-  count: 60,
+  count: 120,
+  maxActiveParticles: 60,
+  particleLifetime: 0.5,
   particles: [],
   tableWidth: 0.514,
   tableHeight: 1.07,
   dummy: new Object3D(),
+  _qualityUnsub: null,
 
   init(parentGroup) {
     if (!parentGroup) {
@@ -71,6 +75,22 @@ export const cellParticles = {
 
     this.group.add(this.instancedMesh);
     parentGroup.add(this.group);
+
+    this._qualityUnsub = eventBus.on('quality:changed', ({ config }) => {
+      if (config) {
+        this.setQuality(config);
+      }
+    });
+  },
+
+  setQuality(qualityConfig) {
+    if (!qualityConfig) return;
+    if (qualityConfig.particlesMax !== undefined) {
+      this.maxActiveParticles = Math.min(this.count, qualityConfig.particlesMax);
+    }
+    if (qualityConfig.particleLifetime !== undefined) {
+      this.particleLifetime = qualityConfig.particleLifetime;
+    }
   },
 
   trigger(x, z, isPhysics = false) {
@@ -86,14 +106,15 @@ export const cellParticles = {
     }
 
     let spawned = 0;
+    const spawnLimit = Math.min(8, Math.floor(this.maxActiveParticles / 8));
 
-    for (let i = 0; i < this.count && spawned < 8; i++) {
+    for (let i = 0; i < this.maxActiveParticles && spawned < spawnLimit; i++) {
       const particle = this.particles[i];
 
       if (!particle.active) {
         particle.active = true;
-        particle.life = 0.5;
-        particle.maxLife = 0.5;
+        particle.life = this.particleLifetime;
+        particle.maxLife = this.particleLifetime;
 
         particle.x = posX;
         particle.y = 0.02;
@@ -133,11 +154,13 @@ export const cellParticles = {
     if (!this.instancedMesh) return;
 
     let spawned = 0;
-    for (let i = 0; i < this.count && spawned < count; i++) {
+    const spawnLimit = Math.min(count, this.maxActiveParticles);
+
+    for (let i = 0; i < this.maxActiveParticles && spawned < spawnLimit; i++) {
       const particle = this.particles[i];
       if (!particle.active) {
         particle.active = true;
-        particle.life = 0.7 + Math.random() * 0.3;
+        particle.life = this.particleLifetime * (0.8 + Math.random() * 0.4);
         particle.maxLife = particle.life;
 
         // Origin at exact ball coordinates
@@ -177,7 +200,7 @@ export const cellParticles = {
     const deltaTime = Math.min(dt, 0.05);
     let needsUpdate = false;
 
-    for (let i = 0; i < this.count; i++) {
+    for (let i = 0; i < this.maxActiveParticles; i++) {
       const particle = this.particles[i];
 
       if (!particle.active) {
@@ -228,6 +251,11 @@ export const cellParticles = {
   },
 
   dispose() {
+    if (this._qualityUnsub) {
+      this._qualityUnsub();
+      this._qualityUnsub = null;
+    }
+
     if (!this.instancedMesh) {
       return;
     }

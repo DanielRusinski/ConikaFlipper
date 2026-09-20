@@ -1,11 +1,15 @@
 import * as THREE from 'three';
 import { GRAPHICS_CONFIG } from '../config/graphicsConfig.js';
+import { eventBus } from '../core/EventBus.js';
 
 export class ShadowSystem {
     constructor() {
         this.keyLight = null;
         this.scene = null;
         this.enabled = true;
+        this.updateFrequency = 1;
+        this._frameCounter = 0;
+        this._qualityUnsub = null;
     }
 
     init(keyLight, scene) {
@@ -28,19 +32,47 @@ export class ShadowSystem {
         this.keyLight.shadow.camera.top = dY;
         this.keyLight.shadow.camera.bottom = -dY;
         this.keyLight.shadow.camera.updateProjectionMatrix();
+
+        this._qualityUnsub = eventBus.on('quality:changed', ({ config }) => {
+            if (config) {
+                this.setQuality(config);
+            }
+        });
     }
 
     setQuality(qualityConfig) {
+        if (!qualityConfig) return;
+
         if (qualityConfig.shadows !== undefined) {
             this.setEnabled(qualityConfig.shadows);
         }
+
+        this.updateFrequency = (qualityConfig.shadowUpdateFrequency !== undefined)
+            ? qualityConfig.shadowUpdateFrequency
+            : 1;
+
         const shadowMapSize = qualityConfig.shadowMapSize || (GRAPHICS_CONFIG.isMobile ? 512 : 1024);
-        if (this.keyLight && this.keyLight.shadow.mapSize.width !== shadowMapSize) {
+        if (this.keyLight && this.keyLight.shadow && this.keyLight.shadow.mapSize.width !== shadowMapSize) {
             this.keyLight.shadow.mapSize.width = shadowMapSize;
             this.keyLight.shadow.mapSize.height = shadowMapSize;
             if (this.keyLight.shadow.map) {
                 this.keyLight.shadow.map.dispose();
                 this.keyLight.shadow.map = null;
+            }
+        }
+    }
+
+    update(renderer) {
+        if (!this.enabled || !renderer || !renderer.shadowMap.enabled) return;
+
+        this._frameCounter++;
+
+        if (this.updateFrequency <= 1) {
+            renderer.shadowMap.autoUpdate = true;
+        } else {
+            renderer.shadowMap.autoUpdate = false;
+            if (this._frameCounter % this.updateFrequency === 0) {
+                renderer.shadowMap.needsUpdate = true;
             }
         }
     }
@@ -73,6 +105,10 @@ export class ShadowSystem {
     }
 
     dispose() {
+        if (this._qualityUnsub) {
+            this._qualityUnsub();
+            this._qualityUnsub = null;
+        }
         if (this.keyLight && this.keyLight.shadow && this.keyLight.shadow.map) {
             this.keyLight.shadow.map.dispose();
             this.keyLight.shadow.map = null;

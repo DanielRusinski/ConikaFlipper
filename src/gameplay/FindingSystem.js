@@ -10,7 +10,7 @@ export class FindingSystem {
     this._group = new THREE.Group();
     this._group.name = 'FindingSystemGroup';
 
-    // Total number of all crystal types combined (active and inactive total): exactly 15
+    // Total number of all crystal types combined (hidden, active, and collected total): exactly 15
     this.TOTAL_CRYSTALS = 15;
     this._slots = [];
     this._nextId = 0;
@@ -84,6 +84,9 @@ export class FindingSystem {
       this._slots.push({
         index: i,
         active: false,
+        revealed: false,
+        animatingSpawn: false,
+        spawnProgress: 0,
         id: i,
         type: 'points_crystal',
         tileIndex: -1,
@@ -92,7 +95,9 @@ export class FindingSystem {
         baseX: 0,
         baseZ: 0,
         baseY: 0.042,
-        scale: 0.016,
+        currentY: 0.042,
+        targetScale: 0.016,
+        currentScale: 0,
         rotationX: 0,
         rotationY: 0,
         rotationSpeed: 2.0,
@@ -128,7 +133,7 @@ export class FindingSystem {
     if (this._labelSystem) {
       for (let i = 0; i < this.TOTAL_CRYSTALS; i++) {
         const slot = this._slots[i];
-        if (slot.active && slot.labelId === null) {
+        if (slot.active && slot.revealed && slot.labelId === null) {
           slot.labelId = this._labelSystem.createLabel(slot.anchorObject, {
             text: slot.labelText,
             className: slot.labelClass,
@@ -140,19 +145,22 @@ export class FindingSystem {
   }
 
   /**
-   * Randomly scatters crystals as InstancedMesh instances across all playable tiles on the board.
-   * Total number of all crystal types combined is exactly 15:
+   * Secretly distributes exactly 15 hidden crystals across eligible tiles on the board.
+   * Crystals are NOT placed visibly on the board at stage start.
+   * They remain hidden until the player rolls over and conquers the tile (tile:discovered).
+   *
+   * Exact breakdown:
    * - 1 - 3 Card Crystals ('modifier', 🃏)
    * - 1 - 2 Life Crystals ('emerald_crystal', +1❤️)
    * - 10 - 13 Points Crystals ('points_crystal', +250💎)
-   * Total: countCards + countLife + countPoints = 15!
+   * Total pool = exactly 15!
    *
    * @param {Object} tileManager
    */
-  spawnBoardCrystals(tileManager) {
+  setupBoardCrystals(tileManager) {
     if (!tileManager || !this.instancedMesh) return;
 
-    // Clean reset any existing findings before spawning new board crystals
+    // Clean reset any existing findings before configuring new board crystals
     this.reset();
 
     const availableTiles = [];
@@ -173,7 +181,7 @@ export class FindingSystem {
 
     if (availableTiles.length === 0) return;
 
-    // Fisher-Yates shuffle available tiles
+    // Fisher-Yates shuffle available tiles for fair random distribution
     for (let i = availableTiles.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       const temp = availableTiles[i];
@@ -188,7 +196,7 @@ export class FindingSystem {
 
     let slotIdx = 0;
 
-    // Helper to configure a slot in the InstancedMesh
+    // Helper to configure a secret hidden slot in the InstancedMesh
     const configureSlot = (type, color, value, radius, labelText, labelClass, rotSpeed) => {
       if (slotIdx >= this.TOTAL_CRYSTALS || slotIdx >= availableTiles.length) return;
       const tile = availableTiles[slotIdx];
@@ -196,7 +204,11 @@ export class FindingSystem {
       const index = tileManager.getTileIndex(tile.gridX, tile.gridY);
       const slot = this._slots[slotIdx];
 
-      slot.active = true;
+      // Secretly pre-assigned: NOT revealed and NOT active yet!
+      slot.active = false;
+      slot.revealed = false;
+      slot.animatingSpawn = false;
+      slot.spawnProgress = 0;
       slot.id = this._nextId++;
       slot.type = type;
       slot.tileIndex = index;
@@ -205,7 +217,9 @@ export class FindingSystem {
       slot.baseX = worldPos.x;
       slot.baseZ = worldPos.z;
       slot.baseY = 0.042;
-      slot.scale = radius;
+      slot.currentY = 0.042;
+      slot.targetScale = radius;
+      slot.currentScale = 0;
       slot.rotationX = 0;
       slot.rotationY = Math.random() * Math.PI * 2;
       slot.rotationSpeed = rotSpeed;
@@ -215,44 +229,21 @@ export class FindingSystem {
       slot.value = value;
       slot.labelText = labelText;
       slot.labelClass = labelClass;
+      slot.labelId = null;
 
-      // Position anchor object for CSS2D labels
+      // Position anchor object at the tile, but keep it hidden until revealed
       slot.anchorObject.position.set(worldPos.x, slot.baseY, worldPos.z);
-      slot.anchorObject.visible = true;
+      slot.anchorObject.visible = false;
 
-      if (this._labelSystem) {
-        slot.labelId = this._labelSystem.createLabel(slot.anchorObject, {
-          text: labelText,
-          className: labelClass,
-          worldOffset: { x: 0, y: 0.038, z: 0 }
-        });
-      }
-
-      // Update instance color & transform in InstancedMesh
+      // Pre-set instance color in InstancedMesh
       this.instancedMesh.setColorAt(slotIdx, color);
-      this._dummy.position.set(worldPos.x, slot.baseY, worldPos.z);
-      this._dummy.rotation.set(0, slot.rotationY, 0);
-      this._dummy.scale.set(radius, radius, radius);
+
+      // Hide instance transform far below table with zero scale
+      this._dummy.position.set(0, -999, 0);
+      this._dummy.rotation.set(0, 0, 0);
+      this._dummy.scale.set(0, 0, 0);
       this._dummy.updateMatrix();
       this.instancedMesh.setMatrixAt(slotIdx, this._dummy.matrix);
-
-      // Backwards-compatible finding map entry
-      const findingData = {
-        id: slot.id,
-        slotIndex: slotIdx,
-        type,
-        value,
-        tileIndex: index,
-        active: true,
-        expiresAt: Infinity,
-        mesh: {
-          position: slot.anchorObject.position,
-          visible: true,
-          userData: { state: 'ready', bloomReady: true }
-        }
-      };
-      this._findings.set(slot.id, findingData);
-      eventBus.emit(type === 'modifier' ? 'modifier:spawned' : 'finding:spawned', { id: slot.id, tileIndex: index, type });
 
       slotIdx++;
     };
@@ -276,6 +267,7 @@ export class FindingSystem {
     while (slotIdx < this.TOTAL_CRYSTALS) {
       const slot = this._slots[slotIdx];
       slot.active = false;
+      slot.revealed = false;
       slot.anchorObject.visible = false;
       this._dummy.position.set(0, -999, 0);
       this._dummy.scale.set(0, 0, 0);
@@ -290,19 +282,106 @@ export class FindingSystem {
     }
   }
 
-  _onTileDiscovered({ tileIndex, x, z, gridX, gridY }) {
-    this._tilesDiscoveredCount = (this._tilesDiscoveredCount || 0) + 1;
-    // Discovery spawning disabled: crystals are pre-populated on the board at stage start
-    // in exact total count of 15 instances to maintain 60 FPS on mobile devices.
+  /**
+   * Alias for setupBoardCrystals for backwards compatibility
+   */
+  spawnBoardCrystals(tileManager) {
+    this.setupBoardCrystals(tileManager);
   }
 
   /**
-   * Backwards-compatible single finding spawn (activates first available inactive slot in InstancedMesh)
+   * Triggered when a tile is rolled over and conquered by the player.
+   * If this tile secretly hides one of our 15 crystals, it is revealed with an animation.
+   */
+  _onTileDiscovered({ tileIndex, x, z, gridX, gridY }) {
+    this._tilesDiscoveredCount = (this._tilesDiscoveredCount || 0) + 1;
+    if (!this.instancedMesh || tileIndex === undefined) return;
+
+    // Check if any of our 15 secret slots is hidden on this discovered tile
+    const slot = this._slots.find(s => s.tileIndex === tileIndex && !s.revealed);
+    if (!slot) return;
+
+    // UNCOVER / REVEAL THE HIDDEN CRYSTAL!
+    slot.revealed = true;
+    slot.active = true;
+    slot.animatingSpawn = true;
+    slot.spawnProgress = 0;
+    slot.currentScale = 0;
+
+    // Position and show anchor object for CSS2D label
+    slot.anchorObject.position.set(slot.baseX, slot.baseY, slot.baseZ);
+    slot.anchorObject.visible = true;
+
+    if (this._labelSystem && slot.labelId === null) {
+      slot.labelId = this._labelSystem.createLabel(slot.anchorObject, {
+        text: slot.labelText,
+        className: slot.labelClass,
+        worldOffset: { x: 0, y: 0.038, z: 0 }
+      });
+    }
+
+    // Set instance color & initial position
+    this.instancedMesh.setColorAt(slot.index, slot.color);
+    this._dummy.position.set(slot.baseX, slot.baseY, slot.baseZ);
+    this._dummy.rotation.set(0, slot.rotationY, 0);
+    this._dummy.scale.set(0.001, 0.001, 0.001);
+    this._dummy.updateMatrix();
+    this.instancedMesh.setMatrixAt(slot.index, this._dummy.matrix);
+
+    this.instancedMesh.instanceMatrix.needsUpdate = true;
+    if (this.instancedMesh.instanceColor) {
+      this.instancedMesh.instanceColor.needsUpdate = true;
+    }
+
+    // Register finding entry
+    const findingData = {
+      id: slot.id,
+      slotIndex: slot.index,
+      type: slot.type,
+      value: slot.value,
+      tileIndex: slot.tileIndex,
+      active: true,
+      expiresAt: Infinity,
+      mesh: {
+        position: slot.anchorObject.position,
+        visible: true,
+        userData: { state: 'ready', bloomReady: true }
+      }
+    };
+    this._findings.set(slot.id, findingData);
+
+    // Audio cue for uncovering a hidden crystal
+    if (slot.type === 'modifier') {
+      playSound(1200, 0.28);
+    } else if (slot.type === 'emerald_crystal') {
+      playSound(1000, 0.22);
+    } else {
+      playSound(820, 0.18);
+    }
+
+    eventBus.emit('crystal:revealed', {
+      slotIndex: slot.index,
+      id: slot.id,
+      type: slot.type,
+      tileIndex: slot.tileIndex,
+      x: slot.baseX,
+      z: slot.baseZ
+    });
+
+    eventBus.emit(slot.type === 'modifier' ? 'modifier:spawned' : 'finding:spawned', {
+      id: slot.id,
+      tileIndex: slot.tileIndex,
+      type: slot.type
+    });
+  }
+
+  /**
+   * Backwards-compatible single finding spawn (for debug settings panel)
    */
   _spawnFinding(worldX, worldZ, tileIndex, type, readyImmediately = true, expiresAt = Infinity) {
     if (!this.instancedMesh) return;
-    const slotIdx = this._slots.findIndex(s => !s.active);
-    if (slotIdx === -1) return; // Pool full (all 15 instances active)
+    const slotIdx = this._slots.findIndex(s => !s.revealed && !s.active);
+    if (slotIdx === -1) return; // Pool full (all 15 instances used)
 
     const slot = this._slots[slotIdx];
     const isModifier = (type === 'modifier');
@@ -313,13 +392,18 @@ export class FindingSystem {
     const value = isModifier ? 100 : (type === 'emerald_crystal' ? 200 : 250);
 
     slot.active = true;
+    slot.revealed = true;
+    slot.animatingSpawn = true;
+    slot.spawnProgress = 0;
     slot.id = this._nextId++;
     slot.type = type;
     slot.tileIndex = tileIndex;
     slot.baseX = worldX;
     slot.baseZ = worldZ;
     slot.baseY = 0.042;
-    slot.scale = radius;
+    slot.currentY = 0.042;
+    slot.targetScale = radius;
+    slot.currentScale = 0;
     slot.rotationX = 0;
     slot.rotationY = 0;
     slot.rotationSpeed = isModifier ? 1.6 : 2.0;
@@ -344,7 +428,7 @@ export class FindingSystem {
     this.instancedMesh.setColorAt(slotIdx, color);
     this._dummy.position.set(worldX, slot.baseY, worldZ);
     this._dummy.rotation.set(0, 0, 0);
-    this._dummy.scale.set(radius, radius, radius);
+    this._dummy.scale.set(0.001, 0.001, 0.001);
     this._dummy.updateMatrix();
     this.instancedMesh.setMatrixAt(slotIdx, this._dummy.matrix);
 
@@ -377,7 +461,7 @@ export class FindingSystem {
 
     for (let i = 0; i < this.TOTAL_CRYSTALS; i++) {
       const slot = this._slots[i];
-      if (!slot.active) {
+      if (!slot.active || !slot.revealed) {
         this._dummy.position.set(0, -999, 0);
         this._dummy.scale.set(0, 0, 0);
         this._dummy.updateMatrix();
@@ -385,18 +469,37 @@ export class FindingSystem {
         continue;
       }
 
+      // Smooth pop-up expansion animation on initial discovery
+      if (slot.animatingSpawn) {
+        slot.spawnProgress = Math.min(1.0, slot.spawnProgress + gameplayDelta * 4.5);
+        // Elastic overshoot easing for juicy gem pop
+        const p = slot.spawnProgress;
+        const overshoot = 1.25;
+        const eased = (p < 0.7)
+          ? (p / 0.7) * overshoot
+          : overshoot - ((p - 0.7) / 0.3) * (overshoot - 1.0);
+        slot.currentScale = slot.targetScale * Math.max(0.01, eased);
+
+        if (slot.spawnProgress >= 1.0) {
+          slot.animatingSpawn = false;
+          slot.currentScale = slot.targetScale;
+        }
+      } else {
+        slot.currentScale = slot.targetScale;
+      }
+
       // Continuous rotation
       slot.rotationY += slot.rotationSpeed * gameplayDelta;
       slot.rotationX += slot.rotationSpeed * 0.45 * gameplayDelta;
 
       // Floating & Bobbing
-      const currentY = slot.baseY + Math.sin(elapsed * 2.2 + slot.timeOffset) * slot.amplitude;
-      slot.anchorObject.position.y = currentY;
+      slot.currentY = slot.baseY + Math.sin(elapsed * 2.2 + slot.timeOffset) * slot.amplitude;
+      slot.anchorObject.position.y = slot.currentY;
 
       // Update transform in InstancedMesh
-      this._dummy.position.set(slot.baseX, currentY, slot.baseZ);
+      this._dummy.position.set(slot.baseX, slot.currentY, slot.baseZ);
       this._dummy.rotation.set(slot.rotationX, slot.rotationY, 0);
-      this._dummy.scale.set(slot.scale, slot.scale, slot.scale);
+      this._dummy.scale.set(slot.currentScale, slot.currentScale, slot.currentScale);
       this._dummy.updateMatrix();
       this.instancedMesh.setMatrixAt(i, this._dummy.matrix);
     }
@@ -416,7 +519,8 @@ export class FindingSystem {
 
     for (let i = 0; i < this.TOTAL_CRYSTALS; i++) {
       const slot = this._slots[i];
-      if (!slot.active) continue;
+      // Only revealed and active crystals can be collected!
+      if (!slot.active || !slot.revealed) continue;
 
       const dx = slot.baseX - bx;
       const dz = slot.baseZ - bz;
@@ -426,6 +530,7 @@ export class FindingSystem {
 
       if (distSq < collectRadius * collectRadius) {
         slot.active = false;
+        slot.revealed = false;
         slot.anchorObject.visible = false;
 
         if (slot.labelId !== null && this._labelSystem) {
@@ -482,6 +587,10 @@ export class FindingSystem {
       const slot = this._slots[i];
       if (slot) {
         slot.active = false;
+        slot.revealed = false;
+        slot.animatingSpawn = false;
+        slot.spawnProgress = 0;
+        slot.currentScale = 0;
         slot.anchorObject.visible = false;
         if (slot.labelId !== null && this._labelSystem) {
           this._labelSystem.removeLabel(slot.labelId);

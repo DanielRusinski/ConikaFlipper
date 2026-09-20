@@ -5,6 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { qualityManager } from '../core/QualityManager.js';
+import { eventBus } from '../core/EventBus.js';
 
 const FilmGrainShader = {
     uniforms: {
@@ -29,7 +30,7 @@ const FilmGrainShader = {
 
         void main() {
             vec4 color = texture2D(tDiffuse, vUv);
-            // Single static fixed noise frame - not animated per frame
+            // Single static fixed noise frame - not animated per frame for zero GPU overhead
             float noise = (random(vUv * 750.0) - 0.5) * intensity;
             color.rgb += noise;
             gl_FragColor = color;
@@ -48,6 +49,7 @@ export class PostProcessingManager {
         this.grainPass = null;
         this.outputPass = null;
         this.enabled = true;
+        this._qualityUnsub = null;
     }
 
     init(renderer, scene, camera) {
@@ -76,9 +78,21 @@ export class PostProcessingManager {
         if (qualityManager && qualityManager.config) {
             this.setQuality(qualityManager.config);
         }
+
+        this._qualityUnsub = eventBus.on('quality:changed', ({ config }) => {
+            if (config) {
+                this.setQuality(config);
+            }
+        });
     }
 
     setQuality(qualityConfig) {
+        if (!qualityConfig) return;
+
+        // When postProcessing is explicitly disabled (e.g. LOW quality tier),
+        // we bypass the EffectComposer completely, rendering directly with WebGLRenderer.
+        this.enabled = qualityConfig.postProcessing !== false;
+
         const useBloom = qualityConfig.bloomEnabled === true;
         if (this.bloomPass) {
             this.bloomPass.enabled = useBloom;
@@ -94,12 +108,10 @@ export class PostProcessingManager {
             this.grainPass.enabled = qualityConfig.grainIntensity !== 0;
             this.grainPass.uniforms.intensity.value = grainIntensity;
         }
-        
-        this.enabled = qualityConfig.postProcessing !== false;
     }
 
     updateTime(time) {
-        // Static grain requested: keep single fixed frame (no per-frame animation)
+        // Static grain requested: keep single fixed frame (no per-frame noise regeneration)
     }
 
     setBloomStrength(strength) {
@@ -154,6 +166,10 @@ export class PostProcessingManager {
     }
 
     dispose() {
+        if (this._qualityUnsub) {
+            this._qualityUnsub();
+            this._qualityUnsub = null;
+        }
         if (this.composer) {
             this.composer.passes.forEach(pass => {
                 if (pass.dispose) pass.dispose();

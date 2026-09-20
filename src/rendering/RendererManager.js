@@ -1,15 +1,23 @@
 import * as THREE from 'three';
-import { GRAPHICS_CONFIG } from '../config/graphicsConfig.js';
+import { GRAPHICS_CONFIG, PERFORMANCE_CONFIG } from '../config/graphicsConfig.js';
 import { LIGHTING_CONFIG } from '../config/lightingConfig.js';
 import { eventBus } from '../core/EventBus.js';
 
 export class RendererManager {
     constructor(container) {
         this.container = container;
-        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        this.renderer = new THREE.WebGLRenderer({
+            antialias: !GRAPHICS_CONFIG.isMobile,
+            alpha: false,
+            powerPreference: 'high-performance',
+            precision: GRAPHICS_CONFIG.isMobile ? 'mediump' : 'highp'
+        });
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 10);
         this.container.appendChild(this.renderer.domElement);
+
+        this._currentQualityConfig = null;
+        this._qualityUnsub = null;
     }
 
     init() {
@@ -35,13 +43,10 @@ export class RendererManager {
             this.renderer.setClearColor(new THREE.Color(defaultPreset.background));
         }
         
-        const maxCap = GRAPHICS_CONFIG.pixelRatioCap || (GRAPHICS_CONFIG.isMobile ? 1.15 : 2);
-        const pixelRatio = Math.min(window.devicePixelRatio, maxCap);
-        this.renderer.setPixelRatio(pixelRatio);
+        const initialLevel = GRAPHICS_CONFIG.isMobile ? 'medium' : 'high';
+        const initialConfig = (PERFORMANCE_CONFIG.levels && PERFORMANCE_CONFIG.levels[initialLevel]) || {};
+        this.setQuality(initialConfig);
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        
-        this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = GRAPHICS_CONFIG.isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
         
         if (GRAPHICS_CONFIG.fog && GRAPHICS_CONFIG.fog.enabled && defaultPreset && defaultPreset.fog) {
             this.scene.fog = new THREE.Fog(
@@ -50,6 +55,13 @@ export class RendererManager {
                 GRAPHICS_CONFIG.fog.far
             );
         }
+
+        // Listen for real-time adaptive quality changes
+        this._qualityUnsub = eventBus.on('quality:changed', ({ config }) => {
+            if (config) {
+                this.setQuality(config);
+            }
+        });
     }
 
     resize(width, height) {
@@ -57,17 +69,28 @@ export class RendererManager {
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
         
-        const maxCap = GRAPHICS_CONFIG.pixelRatioCap || (GRAPHICS_CONFIG.isMobile ? 1.15 : 2);
-        const pixelRatio = Math.min(window.devicePixelRatio, maxCap);
+        const targetRatio = (this._currentQualityConfig && this._currentQualityConfig.pixelRatio)
+            || (GRAPHICS_CONFIG.isMobile ? 0.80 : 1.0);
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, targetRatio);
         this.renderer.setPixelRatio(pixelRatio);
     }
 
     setQuality(qualityConfig) {
-        const maxCap = Math.min(GRAPHICS_CONFIG.pixelRatioCap, qualityConfig.pixelRatio || 2);
-        const pixelRatio = Math.min(window.devicePixelRatio, maxCap);
+        if (!qualityConfig) return;
+        this._currentQualityConfig = qualityConfig;
+
+        const targetRatio = qualityConfig.pixelRatio || (GRAPHICS_CONFIG.isMobile ? 0.80 : 1.0);
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, targetRatio);
         this.renderer.setPixelRatio(pixelRatio);
+
         if (qualityConfig.shadows !== undefined) {
             this.renderer.shadowMap.enabled = qualityConfig.shadows;
+        }
+
+        if (qualityConfig.shadowType) {
+            this.renderer.shadowMap.type = (qualityConfig.shadowType === 'soft' && !GRAPHICS_CONFIG.isMobile)
+                ? THREE.PCFSoftShadowMap
+                : THREE.PCFShadowMap;
         }
     }
 
@@ -84,6 +107,10 @@ export class RendererManager {
     }
 
     dispose() {
+        if (this._qualityUnsub) {
+            this._qualityUnsub();
+            this._qualityUnsub = null;
+        }
         if (this.renderer) {
             if (this.container && this.renderer.domElement && this.container.contains(this.renderer.domElement)) {
                 this.container.removeChild(this.renderer.domElement);
