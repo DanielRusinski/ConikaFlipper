@@ -25,6 +25,7 @@ export class LaserHazardSystem {
     this._activeDuration = 5.0;  // 3-15 seconds random duration
     this._fadeDuration = 0.8;    // 0.8s dissipation
     this._hitTriggered = false;
+    this._prevBallPos = null;
 
     // Board reference & dimensions
     this._tableWidth = GAME_CONFIG.table.width;
@@ -532,6 +533,12 @@ export class LaserHazardSystem {
         break;
       }
     }
+
+    if (ballPos) {
+      this._prevBallPos = { x: ballPos.x, z: ballPos.z };
+    } else {
+      this._prevBallPos = null;
+    }
   }
 
   _setAllBlocksEmitterIntensity(intensity) {
@@ -588,14 +595,51 @@ export class LaserHazardSystem {
     return Math.hypot(bx - projX, bz - projZ);
   }
 
+  _segmentsIntersect(p0, p1, q0, q1) {
+    const ux = p1.x - p0.x;
+    const uz = p1.z - p0.z;
+    const vx = q1.x - q0.x;
+    const vz = q1.z - q0.z;
+    const wx = p0.x - q0.x;
+    const wz = p0.z - q0.z;
+    const D = ux * vz - uz * vx;
+    if (Math.abs(D) < 1e-7) return false;
+    const s = (vx * wz - vz * wx) / D;
+    const t = (ux * wz - uz * wx) / D;
+    return (s >= 0.0 && s <= 1.0 && t >= 0.0 && t <= 1.0);
+  }
+
   /**
-   * Collision check between the active laser line segment and the ball
+   * Collision check between the active laser line segment and the ball.
+   * Uses both point-distance check and continuous trajectory segment intersection to eliminate tunneling.
    */
   _checkBallCollision(ballPos, corridor) {
-    const dist = this._distanceToSegment(ballPos, corridor.p1, corridor.p2);
     const hitRadius = GAME_CONFIG.ball.radius + this._beamRadius;
+    const distCurr = this._distanceToSegment(ballPos, corridor.p1, corridor.p2);
+    let hit = distCurr < hitRadius;
 
-    if (dist < hitRadius) {
+    if (!hit && this._prevBallPos) {
+      // Continuous collision detection: check if ball's path crossed the laser line segment
+      if (this._segmentsIntersect(this._prevBallPos, ballPos, corridor.p1, corridor.p2)) {
+        hit = true;
+      } else {
+        // Also check distance from previous position and trajectory midpoint
+        const distPrev = this._distanceToSegment(this._prevBallPos, corridor.p1, corridor.p2);
+        if (distPrev < hitRadius) {
+          hit = true;
+        } else {
+          const mid = {
+            x: (this._prevBallPos.x + ballPos.x) * 0.5,
+            z: (this._prevBallPos.z + ballPos.z) * 0.5
+          };
+          if (this._distanceToSegment(mid, corridor.p1, corridor.p2) < hitRadius) {
+            hit = true;
+          }
+        }
+      }
+    }
+
+    if (hit) {
       this._hitTriggered = true;
       playSound(120, 0.45); // Sharp electrical zap / destruction sound
 
@@ -609,10 +653,12 @@ export class LaserHazardSystem {
 
   clearHit() {
     this._hitTriggered = false;
+    this._prevBallPos = null;
   }
 
   onBallRespawn() {
     this._hitTriggered = false;
+    this._prevBallPos = null;
     // Reset hazard cycle to IDLE so the player gets a fresh start and laser will hit every time
     this.reset();
   }
@@ -626,6 +672,7 @@ export class LaserHazardSystem {
     this._glowMesh.visible = false;
     this._particles.visible = false;
     this._hitTriggered = false;
+    this._prevBallPos = null;
     this._setAllBlocksEmitterIntensity(1.0);
   }
 

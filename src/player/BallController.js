@@ -35,12 +35,20 @@ export class BallController {
         if (!this.active) return;
         this._collisionSystem.setTilt(tiltX, tiltY);
         
-        this._accumulator += dt;
-        const physicsDt = GAME_CONFIG.physics.physicsDt;
+        const effectiveDt = (gameplayDt !== undefined) ? gameplayDt : dt;
+        this._accumulator += effectiveDt;
+        const maxPhysicsDt = GAME_CONFIG.physics.physicsDt;
         
-        while (this._accumulator >= physicsDt) {
-            this._collisionSystem.step(physicsDt);
-            this._accumulator -= physicsDt;
+        while (this._accumulator >= maxPhysicsDt) {
+            this._collisionSystem.step(maxPhysicsDt);
+            this._accumulator -= maxPhysicsDt;
+        }
+
+        // When in slow motion, effectiveDt is small (< maxPhysicsDt).
+        // Step remaining accumulator smoothly so the ball glides with silky smooth motion without stutter
+        if (this._accumulator > 0.00001) {
+            this._collisionSystem.step(this._accumulator);
+            this._accumulator = 0;
         }
         
         const pos = this._collisionSystem.getPosition();
@@ -53,7 +61,7 @@ export class BallController {
             this.ghostMesh.position.copy(this.mesh.position);
             this.ghostMesh.visible = this._ghostEnabled && this.mesh.visible;
             if (this.ghostMesh.material && this.ghostMesh.material.uniforms && this.ghostMesh.material.uniforms.uTime) {
-                this.ghostMesh.material.uniforms.uTime.value += dt;
+                this.ghostMesh.material.uniforms.uTime.value += effectiveDt;
             }
         }
     }

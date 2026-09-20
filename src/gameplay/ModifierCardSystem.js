@@ -1,6 +1,7 @@
 import { eventBus } from '../core/EventBus.js';
 import { REWARD_CONFIG } from '../config/rewardConfig.js';
 import { gameStateManager, GAME_STATES } from '../core/GameStateManager.js';
+import { playSound } from '../soundfx.js';
 import anime from 'animejs';
 
 export class ModifierCardSystem {
@@ -22,13 +23,15 @@ export class ModifierCardSystem {
     this._container.style.left = '0';
     this._container.style.width = '100%';
     this._container.style.height = '100%';
-    this._container.style.display = 'flex';
     this._container.style.alignItems = 'center';
     this._container.style.justifyContent = 'center';
     this._container.style.gap = '20px';
-    this._container.style.backgroundColor = 'rgba(0,0,0,0.5)';
+    this._container.style.backgroundColor = 'rgba(0,0,0,0.65)';
+    this._container.style.backdropFilter = 'blur(8px)';
+    this._container.style.webkitBackdropFilter = 'blur(8px)';
     this._container.style.zIndex = '2000';
     this._container.style.opacity = '0';
+    this._container.style.pointerEvents = 'none';
     
     uiContainer.appendChild(this._container);
 
@@ -71,7 +74,7 @@ export class ModifierCardSystem {
       cardEl.style.width = '200px';
       cardEl.style.height = '300px';
       cardEl.style.backgroundColor = 'white';
-      cardEl.style.borderRadius = '10px';
+      cardEl.style.borderRadius = '14px';
       cardEl.style.padding = '20px';
       cardEl.style.cursor = 'pointer';
       cardEl.style.display = 'flex';
@@ -80,27 +83,56 @@ export class ModifierCardSystem {
       cardEl.style.transform = 'translateY(50px)';
       cardEl.style.opacity = '0';
       cardEl.tabIndex = 0;
+      cardEl.style.pointerEvents = 'auto';
+      cardEl.style.touchAction = 'manipulation';
+      cardEl.style.userSelect = 'none';
+      cardEl.style.webkitUserSelect = 'none';
       
       const badgeHtml = cardData.duration > 0
         ? `+${cardData.duration}s Time Added ⏱️`
         : `💣 ${cardData.effectValue || 3} Bomby gotowe`;
 
       cardEl.innerHTML = `
-        <div class="modifier-card-title" style="font-weight:bold;font-size:20px;margin-bottom:10px;">${cardData.icon ? cardData.icon + ' ' : ''}${cardData.title}</div>
-        <div class="modifier-card-desc" style="flex-grow:1;text-align:center;font-size:14px;color:#333;margin-bottom:12px;">${cardData.description || cardData.desc || ''}</div>
-        <div class="modifier-card-rarity" style="font-size:14px;font-weight:bold;color:#00887a;background:rgba(0,255,204,0.15);padding:4px 10px;border-radius:12px;border:1px solid rgba(0,180,150,0.3);">${badgeHtml}</div>
+        <div class="modifier-card-title" style="font-weight:bold;font-size:20px;margin-bottom:10px;pointer-events:none;">${cardData.icon ? cardData.icon + ' ' : ''}${cardData.title}</div>
+        <div class="modifier-card-desc" style="flex-grow:1;text-align:center;font-size:14px;color:#333;margin-bottom:12px;pointer-events:none;">${cardData.description || cardData.desc || ''}</div>
+        <div class="modifier-card-rarity" style="font-size:14px;font-weight:bold;color:#00887a;background:rgba(0,255,204,0.15);padding:4px 10px;border-radius:12px;border:1px solid rgba(0,180,150,0.3);pointer-events:none;">${badgeHtml}</div>
       `;
       
+      let handledViaPointer = false;
+      let pointerTimeout = null;
+
       const onSelect = () => this._selectCard(index);
-      cardEl.addEventListener('click', onSelect);
+
+      cardEl.addEventListener('pointerup', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        handledViaPointer = true;
+        if (pointerTimeout) clearTimeout(pointerTimeout);
+        pointerTimeout = setTimeout(() => {
+          handledViaPointer = false;
+        }, 350);
+        onSelect();
+      });
+
+      cardEl.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (handledViaPointer) return;
+        onSelect();
+      });
+
       cardEl.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') onSelect();
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect();
+        }
       });
       
       this._container.appendChild(cardEl);
     });
     
     this._container.style.display = 'flex';
+    this._container.style.pointerEvents = 'auto';
     
     anime({
       targets: this._container,
@@ -127,10 +159,15 @@ export class ModifierCardSystem {
     if (this._selectedCard !== null) return; // Prevent double select
     this._selectedCard = cardIndex;
     
+    try {
+      playSound(1650, 0.35);
+    } catch (_) {}
+
     const cardData = this._cards[cardIndex];
     const cards = Array.from(this._container.childNodes);
     
     cards.forEach((card, idx) => {
+      card.style.pointerEvents = 'none';
       if (idx !== cardIndex) {
         anime({
           targets: card,
@@ -140,10 +177,11 @@ export class ModifierCardSystem {
           easing: 'easeInQuad'
         });
       } else {
+        card.style.boxShadow = '0 0 25px rgba(0, 255, 204, 0.9)';
+        card.style.borderColor = '#00ffcc';
         anime({
           targets: card,
-          scale: 1.1,
-          boxShadow: '0 0 20px rgba(255,255,255,0.8)',
+          scale: 1.08,
           duration: 300,
           easing: 'easeOutQuad'
         });
@@ -158,7 +196,7 @@ export class ModifierCardSystem {
       if (gameStateManager.state === GAME_STATES.MODIFIER_SELECTION) {
         gameStateManager.setState(GAME_STATES.PLAYING);
       }
-    }, 1000);
+    }, 900);
   }
 
   _applyEffect(card) {
@@ -176,6 +214,7 @@ export class ModifierCardSystem {
   }
 
   hide() {
+    this._container.style.pointerEvents = 'none';
     anime({
       targets: this._container,
       opacity: 0,
@@ -183,6 +222,7 @@ export class ModifierCardSystem {
       easing: 'linear',
       complete: () => {
         this._container.style.display = 'none';
+        this._container.style.pointerEvents = 'none';
         this._container.innerHTML = '';
         this._active = false;
         this._selectedCard = null;

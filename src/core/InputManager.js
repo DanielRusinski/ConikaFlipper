@@ -65,6 +65,7 @@ class InputManager {
     // Request iOS orientation permission on any user pointerdown gesture (mouse, touch, or pen)
     const requestOnGesture = () => {
       this.requestGyroPermission();
+      this.requestFullscreenAndLock();
       window.removeEventListener('pointerdown', requestOnGesture);
     };
     window.addEventListener('pointerdown', requestOnGesture, { passive: true });
@@ -91,10 +92,40 @@ class InputManager {
     }
   }
 
+  async requestFullscreenAndLock() {
+    // 1. Request Fullscreen (required by Chrome on Android to lock orientation)
+    try {
+      if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+        await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+      } else if (document.documentElement.webkitRequestFullscreen && !document.webkitFullscreenElement) {
+        await document.documentElement.webkitRequestFullscreen();
+      }
+    } catch (err) {
+      // Ignored if user gesture requirement fails or not supported
+    }
+
+    // 2. Lock screen orientation to portrait-primary
+    try {
+      if (window.screen && window.screen.orientation && typeof window.screen.orientation.lock === 'function') {
+        await window.screen.orientation.lock('portrait-primary');
+      }
+    } catch (err) {
+      try {
+        if (window.screen && window.screen.orientation && typeof window.screen.orientation.lock === 'function') {
+          await window.screen.orientation.lock('portrait');
+        }
+      } catch (err2) {
+        // Not all browsers support orientation.lock
+      }
+    }
+  }
+
   _bindOrientationEvents() {
     if (typeof window !== 'undefined') {
       window.removeEventListener('deviceorientation', this._orientationHandler);
       window.addEventListener('deviceorientation', this._orientationHandler, { passive: true });
+      window.removeEventListener('deviceorientationabsolute', this._orientationHandler);
+      window.addEventListener('deviceorientationabsolute', this._orientationHandler, { passive: true });
 
       if (window.screen && window.screen.orientation) {
         window.screen.orientation.removeEventListener('change', this._screenOrientationHandler);
@@ -123,20 +154,22 @@ class InputManager {
   }
 
   _onScreenOrientationChange() {
-    // Reset auto-calibration when device is rotated between portrait/landscape
-    this._hasAutoCalibrated = false;
+    // Do NOT reset auto-calibration or wipe baseline during gameplay.
+    eventBus.emit('input:screenOrientationChanged', {
+      angle: this.getScreenOrientationAngle()
+    });
   }
 
   calibrate(customBeta, customGamma) {
     if (typeof customBeta === 'number') {
       this.baseBeta = customBeta;
-    } else if (this.isGyroActive) {
+    } else if (this.isGyroActive && (Math.abs(this._rawBeta) > 0.01 || Math.abs(this._rawGamma) > 0.01)) {
       this.baseBeta = this._rawBeta;
     }
 
     if (typeof customGamma === 'number') {
       this.baseGamma = customGamma;
-    } else if (this.isGyroActive) {
+    } else if (this.isGyroActive && (Math.abs(this._rawBeta) > 0.01 || Math.abs(this._rawGamma) > 0.01)) {
       this.baseGamma = this._rawGamma;
     }
 
@@ -188,6 +221,11 @@ class InputManager {
   }
 
   _onPointerDown(e) {
+    // If target is inside UI elements or editable inputs, don't capture for board tilt/drag
+    if (this.isEditableTarget(e.target) || (e.target && e.target.closest && (e.target.closest('#hud') || e.target.closest('#screens') || e.target.closest('#battle-menu-overlay') || e.target.closest('#landscape-notice')))) {
+      return;
+    }
+
     // Only track one primary pointer at a time for board tilt/drag
     if (this._activePointerId !== null && this._activePointerId !== e.pointerId) return;
 
@@ -314,23 +352,13 @@ class InputManager {
       deltaBeta = Math.max(-45, Math.min(45, deltaBeta));
       deltaGamma = Math.max(-45, Math.min(45, deltaGamma));
 
-      // Screen rotation adjustment
-      const screenAngle = this.getScreenOrientationAngle();
-      const rad = (screenAngle * Math.PI) / 180;
-      const cosA = Math.cos(rad);
-      const sinA = Math.sin(rad);
-
-      // Rotate device tilt into screen space:
-      // In 0°: screenDegX = deltaGamma, screenDegY = deltaBeta
-      // In 90°: screenDegX = deltaBeta, screenDegY = -deltaGamma
-      // In 180°: screenDegX = -deltaGamma, screenDegY = -deltaBeta
-      // In 270°: screenDegX = -deltaBeta, screenDegY = deltaGamma
-      const screenDegX = deltaGamma * cosA + deltaBeta * sinA;
-      const screenDegY = deltaBeta * cosA - deltaGamma * sinA;
-
-      // Deadzone filtering & normalized scaling [-1, 1]
-      targetTiltX = this._normalizeAngle(screenDegX, this.maxTiltAngle, this.deadzone);
-      targetTiltY = this._normalizeAngle(screenDegY, this.maxTiltAngle, this.deadzone);
+      // Direct portrait mapping matching keyboard WASD:
+      // Phone tilt left (deltaGamma < 0) -> targetTiltX < 0 (table tilts left, ball rolls left, like 'A')
+      // Phone tilt right (deltaGamma > 0) -> targetTiltX > 0 (table tilts right, ball rolls right, like 'D')
+      // Phone tilt forward/down (deltaBeta < 0) -> targetTiltY < 0 (table tilts forward, ball rolls up/forward, like 'W')
+      // Phone tilt back/up (deltaBeta > 0) -> targetTiltY > 0 (table tilts back, ball rolls down, like 'S')
+      targetTiltX = this._normalizeAngle(deltaGamma, this.maxTiltAngle, this.deadzone);
+      targetTiltY = this._normalizeAngle(deltaBeta, this.maxTiltAngle, this.deadzone);
     } else if (this._pointerDown) {
       // Pointer drag fallback (only when gyro is not active)
       const dx = this._currentPointerX - this._pointerStartX;
@@ -348,7 +376,7 @@ class InputManager {
     }
 
     // Smooth lerp towards target tilt
-    const lerpSpeed = this.isGyroActive ? 0.25 : 0.15;
+    const lerpSpeed = this.isGyroActive ? 0.35 : 0.15;
     this.tiltX += (targetTiltX - this.tiltX) * lerpSpeed;
     this.tiltY += (targetTiltY - this.tiltY) * lerpSpeed;
     
@@ -366,6 +394,7 @@ class InputManager {
       this._canvas.removeEventListener('pointercancel', this._pointercancelHandler);
     }
     window.removeEventListener('deviceorientation', this._orientationHandler);
+    window.removeEventListener('deviceorientationabsolute', this._orientationHandler);
     if (window.screen && window.screen.orientation) {
       window.screen.orientation.removeEventListener('change', this._screenOrientationHandler);
     }

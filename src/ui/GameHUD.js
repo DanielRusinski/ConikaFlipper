@@ -16,6 +16,7 @@ export class GameHUD {
     this._ballIndicatorEl = null;
     this._modifierEl = null;
     this._battleBtn = null;
+    this._battleOrbBtn = null;
     this._pauseBtn = null;
     this._recenterBtn = null;
     this._selectionBannerEl = null;
@@ -56,19 +57,23 @@ export class GameHUD {
         </div>
       </div>
 
-      <div id="selection-banner" style="display:none; position:absolute; top:75px; left:50%; transform:translateX(-50%); background:linear-gradient(180deg, rgba(16, 24, 46, 0.94), rgba(8, 14, 28, 0.98)); border:1.5px solid rgba(0, 229, 255, 0.65); border-radius:26px; padding:8px 20px; color:#fff; font-size:14px; font-weight:700; align-items:center; gap:14px; box-shadow:0 0 20px rgba(0, 229, 255, 0.35), 0 8px 24px rgba(0, 0, 0, 0.65); z-index:100; pointer-events:auto; user-select:none; white-space:nowrap;">
-        <span id="selection-text">🎯 Tap tile to spawn ball</span>
-        <button id="selection-launch-btn" class="selection-launch-btn" style="background:linear-gradient(135deg, #00f0ff 0%, #0080ff 100%); color:#031020; border:none; border-radius:16px; padding:7px 18px; font-size:13px; font-weight:800; letter-spacing:0.8px; cursor:pointer; box-shadow:0 0 14px rgba(0, 240, 255, 0.6); text-transform:uppercase;">🚀 LAUNCH</button>
-      </div>
-
       <div id="hud-bottom-bar">
-        <div id="ball-indicator" title="Current Ball (Tap to customize)"></div>
+        <button id="ball-indicator" class="hud-ball-btn" type="button" title="Current Ball (Tap to customize)" aria-label="Change Ball"></button>
         <div id="active-modifier"></div>
+
+        <!-- Central circular semi-transparent Battle/Equipment Orb button -->
+        <button id="battle-orb-btn" class="battle-orb-btn" type="button" title="⚡ Opcje i Ekwipunek (Battle Menu)" aria-label="Battle Menu">
+          <div class="battle-orb-inner">
+            <span class="battle-orb-icon">⚡</span>
+          </div>
+          <div class="battle-orb-glow"></div>
+        </button>
+
         <div style="display:flex; gap:10px; pointer-events:auto; align-items:center;">
-          <button id="bomb-action-btn" class="hud-touch-btn bomb-hud-btn" style="display:none; pointer-events:auto; background:linear-gradient(180deg, rgba(50, 18, 18, 0.94), rgba(28, 8, 8, 0.98)); border:1.5px solid rgba(255, 69, 58, 0.7); border-radius:12px; padding:8px 16px; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 14px rgba(255, 69, 58, 0.35); align-items:center; gap:6px;">💣 <span id="bomb-btn-count">0</span></button>
-          <button id="recenter-btn" class="hud-touch-btn" style="display:none; pointer-events:auto; background:linear-gradient(180deg, rgba(20, 36, 60, 0.92), rgba(10, 18, 36, 0.96)); border:1.5px solid rgba(0, 229, 255, 0.5); border-radius:12px; padding:8px 14px; color:#00e5ff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 229, 255, 0.2); align-items:center; gap:5px;" title="Wyzeruj poziom stołu">🎯 Poziom</button>
-          <button id="battle-menu-btn" class="hud-touch-btn" style="pointer-events:auto; background:linear-gradient(180deg, rgba(26, 36, 62, 0.92), rgba(13, 19, 36, 0.96)); border:1.5px solid rgba(120, 180, 255, 0.45); border-radius:12px; padding:8px 16px; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 180, 255, 0.2); display:inline-flex; align-items:center; gap:6px;">⚡ Battle</button>
-          <button id="pause-btn" class="hud-touch-btn" style="pointer-events:auto; background:linear-gradient(180deg, rgba(26, 36, 62, 0.92), rgba(13, 19, 36, 0.96)); border:1.5px solid rgba(120, 180, 255, 0.45); border-radius:12px; padding:8px 16px; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 180, 255, 0.2); display:inline-flex; align-items:center; gap:6px;">⏸️ Pause</button>
+          <button id="fullscreen-btn" class="hud-touch-btn" type="button" style="display:none; pointer-events:auto; background:linear-gradient(180deg, rgba(20, 36, 60, 0.92), rgba(10, 18, 36, 0.96)); border:1.5px solid rgba(0, 229, 255, 0.5); border-radius:12px; padding:8px 12px; color:#00e5ff; font-size:13px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 229, 255, 0.2); align-items:center; gap:5px;" title="Pełny ekran i blokada orientacji pionowej">📱 Pion</button>
+          <button id="bomb-action-btn" class="hud-touch-btn bomb-hud-btn" type="button" style="display:none; pointer-events:auto; background:linear-gradient(180deg, rgba(50, 18, 18, 0.94), rgba(28, 8, 8, 0.98)); border:1.5px solid rgba(255, 69, 58, 0.7); border-radius:12px; padding:8px 16px; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 14px rgba(255, 69, 58, 0.35); align-items:center; gap:6px;">💣 <span id="bomb-btn-count">0</span></button>
+          <button id="recenter-btn" class="hud-touch-btn" type="button" style="display:none; pointer-events:auto; background:linear-gradient(180deg, rgba(20, 36, 60, 0.92), rgba(10, 18, 36, 0.96)); border:1.5px solid rgba(0, 229, 255, 0.5); border-radius:12px; padding:8px 14px; color:#00e5ff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 229, 255, 0.2); align-items:center; gap:5px;" title="Wyzeruj poziom stołu">🎯 Poziom</button>
+          <button id="pause-btn" class="hud-touch-btn" type="button" style="pointer-events:auto; background:linear-gradient(180deg, rgba(26, 36, 62, 0.92), rgba(13, 19, 36, 0.96)); border:1.5px solid rgba(120, 180, 255, 0.45); border-radius:12px; padding:8px 16px; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 180, 255, 0.2); display:inline-flex; align-items:center; gap:6px;">⏸️ Pause</button>
         </div>
       </div>
     `;
@@ -93,52 +98,101 @@ export class GameHUD {
     this._modifierEl = document.getElementById('active-modifier');
     this._bombBtn = document.getElementById('bomb-action-btn');
     this._bombCountSpan = document.getElementById('bomb-btn-count');
+    this._fullscreenBtn = document.getElementById('fullscreen-btn');
     this._recenterBtn = document.getElementById('recenter-btn');
-    this._battleBtn = document.getElementById('battle-menu-btn');
+    this._battleOrbBtn = document.getElementById('battle-orb-btn');
     this._pauseBtn = document.getElementById('pause-btn');
-    this._selectionBannerEl = document.getElementById('selection-banner');
-    this._launchBtn = document.getElementById('selection-launch-btn');
+
+    // Robust tap & click handler supporting mouse, touchscreen, and stylus
+    const attachButtonTrigger = (btn, onTrigger) => {
+      if (!btn) return;
+      let handledViaPointer = false;
+
+      btn.addEventListener('pointerup', (e) => {
+        handledViaPointer = true;
+        e.preventDefault();
+        e.stopPropagation();
+        onTrigger();
+        setTimeout(() => { handledViaPointer = false; }, 350);
+      });
+
+      btn.addEventListener('click', (e) => {
+        if (handledViaPointer) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onTrigger();
+      });
+    };
+
+    attachButtonTrigger(this._battleOrbBtn, () => {
+      eventBus.emit('ui:battleMenuRequested');
+    });
+
+    attachButtonTrigger(this._pauseBtn, () => {
+      eventBus.emit('ui:pauseRequested');
+    });
+
+    attachButtonTrigger(this._ballIndicatorEl, () => {
+      eventBus.emit('ui:equipmentRequested');
+    });
+
+    if (this._fullscreenBtn) {
+      attachButtonTrigger(this._fullscreenBtn, async () => {
+        await inputManager.requestFullscreenAndLock();
+        const origHtml = this._fullscreenBtn.innerHTML;
+        this._fullscreenBtn.innerHTML = '✓ Pion OK!';
+        this._fullscreenBtn.style.borderColor = '#00ffcc';
+        setTimeout(() => {
+          if (this._fullscreenBtn) {
+            this._fullscreenBtn.innerHTML = origHtml;
+            this._fullscreenBtn.style.borderColor = 'rgba(0, 229, 255, 0.5)';
+          }
+        }, 1000);
+      });
+    }
 
     if (this._recenterBtn) {
-      if (inputManager.isGyroActive) {
-        this._recenterBtn.style.display = 'inline-flex';
-      }
-      this._recenterBtn.addEventListener('click', () => {
+      attachButtonTrigger(this._recenterBtn, async () => {
         inputManager.calibrate();
+        await inputManager.requestFullscreenAndLock();
         const origHtml = this._recenterBtn.innerHTML;
-        this._recenterBtn.innerHTML = '✓ OK!';
+        this._recenterBtn.innerHTML = '✓ Poziom OK!';
         this._recenterBtn.style.borderColor = '#00ffcc';
         setTimeout(() => {
           if (this._recenterBtn) {
             this._recenterBtn.innerHTML = origHtml;
             this._recenterBtn.style.borderColor = 'rgba(0, 229, 255, 0.5)';
           }
-        }, 700);
+        }, 1000);
       });
+    }
+
+    const landscapeLockBtn = document.getElementById('landscape-lock-btn');
+    if (landscapeLockBtn) {
+      attachButtonTrigger(landscapeLockBtn, async () => {
+        await inputManager.requestFullscreenAndLock();
+      });
+    }
+
+    const isTouchOrMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches);
+    if (isTouchOrMobile || inputManager.isGyroActive) {
+      if (this._recenterBtn) this._recenterBtn.style.display = 'inline-flex';
+      if (this._fullscreenBtn) this._fullscreenBtn.style.display = 'inline-flex';
     }
 
     if (this._bombBtn) {
-      this._bombBtn.addEventListener('click', () => {
+      attachButtonTrigger(this._bombBtn, () => {
         eventBus.emit('ui:toggleBombTargeting');
       });
     }
-
-    this._battleBtn.addEventListener('click', () => {
-      eventBus.emit('ui:battleMenuRequested');
-    });
-
-    this._pauseBtn.addEventListener('click', () => {
-      eventBus.emit('ui:pauseRequested');
-    });
-
-    this._ballIndicatorEl.addEventListener('click', () => {
-      eventBus.emit('ui:equipmentRequested');
-    });
 
     this._unsubs.push(
       eventBus.on('input:gyroActive', () => {
         if (this._recenterBtn) {
           this._recenterBtn.style.display = 'inline-flex';
+        }
+        if (this._fullscreenBtn) {
+          this._fullscreenBtn.style.display = 'inline-flex';
         }
       }),
       eventBus.on('score:changed', (data) => {
@@ -177,6 +231,15 @@ export class GameHUD {
           this._bombBtn.style.borderColor = 'rgba(255, 69, 58, 0.7)';
           this._bombBtn.style.boxShadow = '0 4px 14px rgba(0, 0, 0, 0.55), 0 0 14px rgba(255, 69, 58, 0.35)';
         }
+      }),
+      eventBus.on('battleMenu:stateChanged', ({ active }) => {
+        if (this._battleOrbBtn) {
+          if (active) {
+            this._battleOrbBtn.classList.add('active');
+          } else {
+            this._battleOrbBtn.classList.remove('active');
+          }
+        }
       })
     );
 
@@ -186,16 +249,11 @@ export class GameHUD {
   }
 
   showSelectionBanner(onLaunch) {
-    if (!this._selectionBannerEl) return;
-    this._selectionBannerEl.style.display = 'flex';
-    if (this._launchBtn && onLaunch) {
-      this._launchBtn.onclick = onLaunch;
-    }
+    // Selection banner removed per user request
   }
 
   hideSelectionBanner() {
-    if (!this._selectionBannerEl) return;
-    this._selectionBannerEl.style.display = 'none';
+    // Selection banner removed per user request
   }
 
   _updateLives(lives) {

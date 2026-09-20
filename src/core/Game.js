@@ -85,6 +85,8 @@ export class Game {
         this._targetCameraZoom = 1.0;
         this._minZoom = 0.68;
         this._maxZoom = 1.45;
+        this._battleCameraProgress = 0.0;
+        this._targetBattleCameraProgress = 0.0;
 
         // Table selector (Entry Phase)
         this.tableSelector = null;
@@ -371,8 +373,10 @@ export class Game {
                 gameStateManager.setState(GAME_STATES.PLAYING);
             } else if (prev === GAME_STATES.SELECTION) {
                 this.gameHUD.show();
-                this.gameHUD.showSelectionBanner(() => this.tableSelector.confirm());
                 gameStateManager.setState(GAME_STATES.SELECTION);
+            } else if (prev === GAME_STATES.SLOW_MOTION_MENU) {
+                this.gameHUD.show();
+                gameStateManager.setState(GAME_STATES.SLOW_MOTION_MENU);
             } else {
                 this.showTitle();
             }
@@ -440,29 +444,24 @@ export class Game {
             this._onStateChanged(state, previousState);
         });
 
-        // Battle menu button
-        const battleBtn = document.getElementById('battle-menu-btn');
-        if (battleBtn) {
-            battleBtn.addEventListener('click', () => {
-                if (gameStateManager.is(GAME_STATES.PLAYING)) {
-                    this.battleMenuSystem.open();
-                } else if (gameStateManager.is(GAME_STATES.SLOW_MOTION_MENU)) {
-                    this.battleMenuSystem.close();
-                }
-            });
-        }
+        // Battle menu (via circular battle orb or UI event)
+        eventBus.on('ui:battleMenuRequested', () => {
+            if (this.battleMenuSystem) {
+                this.battleMenuSystem.toggle();
+            }
+        });
 
         // Keyboard: Escape
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Escape') {
-                if (gameStateManager.is(GAME_STATES.PLAYING)) {
-                    this.pauseGame();
-                } else if (gameStateManager.is(GAME_STATES.PAUSED)) {
+                if (gameStateManager.is(GAME_STATES.PAUSED)) {
                     this.resumeGame();
                 } else if (gameStateManager.is(GAME_STATES.SLOW_MOTION_MENU)) {
                     this.battleMenuSystem.close();
                 } else if (gameStateManager.is(GAME_STATES.EQUIPMENT)) {
                     eventBus.emit('ui:equipmentBack');
+                } else if (gameStateManager.is(GAME_STATES.PLAYING) || gameStateManager.is(GAME_STATES.SELECTION)) {
+                    this.pauseGame();
                 }
             }
         });
@@ -598,9 +597,11 @@ export class Game {
 
             // Update ball physics only if active (not destroyed)
             const ballActive = Boolean(this.ballController && this.ballController.active);
-            const ballPos = (this.ballController && this.ballController.getPhysicsPosition)
+            const ballPos = (this.ballController && this.ballController.getPhysicsPosition && ballActive)
                 ? this.ballController.getPhysicsPosition()
-                : { x: this._tableCenterX, y: this._tableCenterZ };
+                : (this.tableSelector && this.tableSelector.mesh && this.tableSelector.active
+                    ? { x: this.tableSelector.mesh.position.x + this._tableCenterX, y: this.tableSelector.mesh.position.z + this._tableCenterZ }
+                    : { x: this._tableCenterX, y: this._tableCenterZ });
 
             if (ballActive) {
                 this.ballController.update(
@@ -631,7 +632,7 @@ export class Game {
             this.findingSystem.update(gameplayDelta);
 
             // Laser hazard
-            if (this.laserHazardSystem && isPlaying) {
+            if (this.laserHazardSystem && (isPlaying || isSlowMo)) {
                 const ball3D = (ballActive && this.ballController && this.ballController.mesh)
                     ? this.ballController.mesh.position
                     : null;
@@ -657,7 +658,7 @@ export class Game {
             }
 
             // Enemy system (Cylinder / Walce patrolling 3x3 perimeters)
-            if (this.enemySystem && isPlaying) {
+            if (this.enemySystem && (isPlaying || isSlowMo)) {
                 try {
                     this.enemySystem.update(gameplayDelta);
                 } catch (err) {
@@ -693,13 +694,31 @@ export class Game {
             // Smooth zoom dampening
             this._cameraZoom += (this._targetCameraZoom - this._cameraZoom) * Math.min(delta * 5.0, 1.0);
 
+            // Battle camera zoom progress (smooth transition in/out of bullet-time close-up)
+            this._targetBattleCameraProgress = isSlowMo ? 1.0 : 0.0;
+            const battleLerpRate = 1.0 - Math.exp(-5.0 * delta);
+            this._battleCameraProgress += (this._targetBattleCameraProgress - this._battleCameraProgress) * battleLerpRate;
+            const p = Math.max(0, Math.min(1, this._battleCameraProgress));
+            const smoothP = p * p * (3 - 2 * p); // smoothstep S(p)
+
             // Camera follow with fluid zoom & exponential decay dampening
             const ball3DX = ballPos.x - this._tableCenterX;
             const ball3DZ = ballPos.y - this._tableCenterZ;
 
-            const camTargetX = ball3DX * GAME_CONFIG.camera.followStrength;
-            const camTargetZ = (GAME_CONFIG.camera.zOffset + ball3DZ * GAME_CONFIG.camera.followStrength) * this._cameraZoom;
-            const camTargetY = GAME_CONFIG.camera.height * this._cameraZoom;
+            // Overview target
+            const normCamTargetX = ball3DX * GAME_CONFIG.camera.followStrength;
+            const normCamTargetY = GAME_CONFIG.camera.height * this._cameraZoom;
+            const normCamTargetZ = (GAME_CONFIG.camera.zOffset + ball3DZ * GAME_CONFIG.camera.followStrength) * this._cameraZoom;
+
+            // Close-up target centered on ball
+            const closeCamTargetX = ball3DX;
+            const closeCamTargetY = 0.26;
+            const closeCamTargetZ = ball3DZ + 0.22;
+
+            // Blend targets
+            const camTargetX = normCamTargetX + (closeCamTargetX - normCamTargetX) * smoothP;
+            const camTargetY = normCamTargetY + (closeCamTargetY - normCamTargetY) * smoothP;
+            const camTargetZ = normCamTargetZ + (closeCamTargetZ - normCamTargetZ) * smoothP;
 
             const camLerp = 1.0 - Math.exp(-GAME_CONFIG.camera.lerpSpeed * delta);
             this._currentCamPos.x += (camTargetX - this._currentCamPos.x) * camLerp;
@@ -711,7 +730,21 @@ export class Game {
                 this._currentCamPos.y,
                 this._currentCamPos.z
             );
-            this._targetCamLookAt.set(ball3DX * 0.12, 0, ball3DZ * 0.12);
+
+            // Overview lookAt vs Close-up lookAt
+            const normLookAtX = ball3DX * 0.12;
+            const normLookAtY = 0;
+            const normLookAtZ = ball3DZ * 0.12;
+
+            const closeLookAtX = ball3DX;
+            const closeLookAtY = GAME_CONFIG.ball.radius;
+            const closeLookAtZ = ball3DZ;
+
+            const targetLookAtX = normLookAtX + (closeLookAtX - normLookAtX) * smoothP;
+            const targetLookAtY = normLookAtY + (closeLookAtY - normLookAtY) * smoothP;
+            const targetLookAtZ = normLookAtZ + (closeLookAtZ - normLookAtZ) * smoothP;
+
+            this._targetCamLookAt.set(targetLookAtX, targetLookAtY, targetLookAtZ);
             this._camLookAt.lerp(this._targetCamLookAt, camLerp);
             this.camera.lookAt(this._camLookAt);
 
@@ -719,6 +752,8 @@ export class Game {
             cellParticles.update(gameplayDelta);
 
         } else if (gameStateManager.is(GAME_STATES.SELECTION)) {
+            this._targetBattleCameraProgress = 0.0;
+            this._battleCameraProgress = 0.0;
             // Update table selector in entry phase
             this.tableSelector.update(timestamp);
             this._cameraZoom += (this._targetCameraZoom - this._cameraZoom) * Math.min(delta * 5.0, 1.0);
@@ -844,7 +879,14 @@ export class Game {
     }
 
     _onLaserHit(data) {
-        if (!gameStateManager.is(GAME_STATES.PLAYING)) return;
+        if (!gameStateManager.is(GAME_STATES.PLAYING) && !gameStateManager.is(GAME_STATES.SLOW_MOTION_MENU)) return;
+
+        // If in slow motion menu, close it and restore speed
+        if (this.battleMenuSystem && this.battleMenuSystem._active) {
+            this.battleMenuSystem.close();
+        }
+        timeManager.targetTimeScale = 1.0;
+        this._targetBattleCameraProgress = 0.0;
 
         playSound(110, 0.45);
         
@@ -873,7 +915,7 @@ export class Game {
         } else {
             // Player lost 1 life: after a brief destruction pause, allow player to pick a valid tile to respawn
             setTimeout(() => {
-                if (gameStateManager.is(GAME_STATES.PLAYING) || gameStateManager.is(GAME_STATES.SELECTION)) {
+                if (gameStateManager.is(GAME_STATES.PLAYING) || gameStateManager.is(GAME_STATES.SELECTION) || gameStateManager.is(GAME_STATES.SLOW_MOTION_MENU)) {
                     this.respawnEntryPhase();
                 }
             }, 450);
@@ -883,7 +925,6 @@ export class Game {
     respawnEntryPhase() {
         this.screenManager.hideAll();
         this.gameHUD.show();
-        this.gameHUD.showSelectionBanner(() => this.tableSelector.confirm());
 
         // Show stage briefing banner during tile selection
         if (this.stageBriefing) {
@@ -912,10 +953,13 @@ export class Game {
     }
 
     launchBall(gridX, gridY) {
-        this.gameHUD.hideSelectionBanner();
         if (this.stageBriefing) {
             this.stageBriefing.hide();
         }
+
+        // Calibrate handheld gyro resting posture at launch moment & enforce orientation lock
+        inputManager.calibrate();
+        inputManager.requestFullscreenAndLock();
 
         if (this.ballController) {
             this.ballController.reset(gridX, gridY, this.tileManager);
@@ -1037,7 +1081,12 @@ export class Game {
     }
 
     pauseGame() {
-        if (gameStateManager.is(GAME_STATES.PLAYING)) {
+        const state = gameStateManager.state;
+        if (state === GAME_STATES.PLAYING || state === GAME_STATES.SELECTION || state === GAME_STATES.SLOW_MOTION_MENU) {
+            if (this.battleMenuSystem && this.battleMenuSystem._active) {
+                this.battleMenuSystem.close();
+            }
+            this._pausePrevState = state;
             gameStateManager.setState(GAME_STATES.PAUSED);
             this.screenManager.show('pause');
         }
@@ -1047,7 +1096,9 @@ export class Game {
         if (gameStateManager.is(GAME_STATES.PAUSED) || gameStateManager.is(GAME_STATES.EQUIPMENT)) {
             this.screenManager.hideAll();
             this.gameHUD.show();
-            gameStateManager.setState(GAME_STATES.PLAYING);
+            const target = this._pausePrevState || GAME_STATES.PLAYING;
+            this._pausePrevState = null;
+            gameStateManager.setState(target);
         }
     }
 
@@ -1149,7 +1200,7 @@ export class Game {
     }
 
     _onStateChanged(state, previousState) {
-        if (state === GAME_STATES.PLAYING || state === GAME_STATES.SELECTION) {
+        if (state === GAME_STATES.PLAYING || state === GAME_STATES.SELECTION || state === GAME_STATES.SLOW_MOTION_MENU) {
             this.gameHUD.show();
             if (this.labelSystem) this.labelSystem.setVisible(true);
         } else {

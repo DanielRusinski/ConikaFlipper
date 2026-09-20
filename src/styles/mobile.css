@@ -53,8 +53,83 @@ button, .hud-touch-btn, .screen-btn, .selection-launch-btn {
     padding-left: max(12px, env(safe-area-inset-left));
     padding-right: max(12px, env(safe-area-inset-right));
   }
+}
 
-  #selection-banner {
-    top: max(80px, calc(env(safe-area-inset-top) + 60px));
+/* Landscape guard on mobile devices: gently prompts to hold portrait or tap lock button */
+@media screen and (orientation: landscape) and (max-height: 600px) and (hover: none) {
+  #landscape-notice {
+    display: flex !important;
   }
 }
+
+.landscape-notice {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(8, 12, 24, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  color: #fff;
+  text-align: center;
+  padding: 20px;
+}
+
+.landscape-notice-box {
+  background: rgba(18, 26, 46, 0.92);
+  border: 1.5px solid rgba(0, 229, 255, 0.45);
+  border-radius: 18px;
+  padding: 24px 28px;
+  max-width: 380px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.75), 0 0 20px rgba(0, 229, 255, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.landscape-notice-icon {
+  font-size: 38px;
+  animation: pulseRotate 2.2s infinite ease-in-out;
+}
+
+@keyframes pulseRotate {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-90deg); }
+}
+
+.landscape-notice-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #00e5ff;
+  letter-spacing: 1px;
+}
+
+.landscape-notice-sub {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.4;
+}
+
+.landscape-lock-btn {
+  margin-top: 6px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #00b4d8, #0077b6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 4px 14px rgba(0, 180, 216, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.landscape-lock-btn:active {
+  transform: scale(0.95);
+}
+

@@ -15,8 +15,8 @@
 .ball-option { background:rgba(255,255,255,0.08); border:2px solid transparent; border-radius:12px; padding:16px; cursor:pointer; transition:border-color 0.2s,transform 0.15s; text-align:center; min-height:48px; }
 .ball-option.selected { border-color:#00ffcc; background:rgba(0,255,204,0.1); }
 .ball-option:active { transform:scale(0.95); }
-.modifier-cards { display:flex; gap:12px; justify-content:center; padding:20px; }
-.modifier-card { background:linear-gradient(145deg,rgba(255,255,255,0.1),rgba(255,255,255,0.02)); border:1px solid rgba(255,255,255,0.15); border-radius:16px; padding:20px; width:140px; cursor:pointer; transition:transform 0.2s,border-color 0.2s; }
+.modifier-cards { display:flex; gap:12px; justify-content:center; padding:20px; pointer-events:auto !important; }
+.modifier-card { background:linear-gradient(145deg,rgba(255,255,255,0.1),rgba(255,255,255,0.02)); border:1px solid rgba(255,255,255,0.15); border-radius:16px; padding:20px; width:140px; cursor:pointer; transition:transform 0.2s,border-color 0.2s; pointer-events:auto !important; touch-action:manipulation; user-select:none; }
 .modifier-card:hover,.modifier-card:focus-visible { transform:translateY(-4px); border-color:#00ffcc; }
 .modifier-card.selected { border-color:#ffd93d; box-shadow:0 0 20px rgba(255,217,61,0.3); }
 .modifier-card-title { font-weight:700; margin-bottom:8px; font-size:14px; }

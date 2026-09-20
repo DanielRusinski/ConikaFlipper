@@ -6,7 +6,7 @@ export const GAME_CONFIG = {
   obstacles: { density:0.08, safeRadius:3, maxRetries:10 },
   lives: { starting:3 },
   timer: { startingSeconds:300 },
-  slowMotion: { scale:0.2 },
+  slowMotion: { scale:0.04 },
   camera: { height:1.2, followStrength:0.25, lerpSpeed:4.0, zOffset:0.7 },
   spawn: { defaultGridX:9, defaultGridY:18 }
 };

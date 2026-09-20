@@ -1,4 +1,5 @@
 import { eventBus } from '../../core/EventBus.js';
+import { inputManager } from '../../core/InputManager.js';
 import anime from 'animejs';
 
 export class TitleScreen {
@@ -37,10 +38,14 @@ export class TitleScreen {
     container.appendChild(this._el);
     
     const playBtn = this._el.querySelector('#play-btn');
-    const triggerStart = (e) => {
+    const triggerStart = async (e) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
+      await inputManager.requestGyroPermission();
+      await inputManager.requestFullscreenAndLock();
+      inputManager.calibrate();
       eventBus.emit('ui:startRequested');
     };
+    playBtn.addEventListener('pointerup', triggerStart);
     playBtn.addEventListener('click', triggerStart);
     
     const eqBtn = this._el.querySelector('#equipment-btn');

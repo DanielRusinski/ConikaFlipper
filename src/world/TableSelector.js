@@ -163,7 +163,7 @@ export class TableSelector {
 
   _onPointerDown(e) {
     if (!this.active) return;
-    if (e.target && e.target.closest && (e.target.closest('#hud') || e.target.closest('#selection-banner') || e.target.closest('#screens'))) return;
+    if (e.target && e.target.closest && (e.target.closest('#hud') || e.target.closest('#screens'))) return;
 
     this.pointerType = e.pointerType; // 'mouse' | 'touch' | 'pen'
     const tile = this._getTileFromPointer(e);
@@ -222,6 +222,7 @@ export class TableSelector {
 
     // Calibrate gyro resting posture at launch moment
     inputManager.calibrate();
+    inputManager.requestFullscreenAndLock();
 
     const worldPos = this._tileManager.getTileWorldPos(this.gridX, this.gridY);
     const spawnData = {

@@ -18,22 +18,33 @@ export class BattleMenuSystem {
     this._container = document.createElement('div');
     this._container.className = 'battle-menu-panel';
     this._container.style.position = 'absolute';
-    this._container.style.bottom = '20px';
-    this._container.style.left = '50%';
-    this._container.style.transform = 'translateX(-50%) translateY(100px)';
-    this._container.style.backgroundColor = 'rgba(0,0,0,0.8)';
+    this._container.style.bottom = '95px';
+    this._container.style.left = '0';
+    this._container.style.right = '0';
+    this._container.style.margin = '0 auto';
+    this._container.style.width = 'max-content';
+    this._container.style.backgroundColor = 'rgba(8, 14, 28, 0.88)';
+    this._container.style.backdropFilter = 'blur(12px)';
+    this._container.style.webkitBackdropFilter = 'blur(12px)';
+    this._container.style.border = '1.5px solid rgba(0, 229, 255, 0.5)';
+    this._container.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 229, 255, 0.25)';
     this._container.style.color = 'white';
-    this._container.style.padding = '20px';
-    this._container.style.borderRadius = '10px';
+    this._container.style.padding = '18px 24px';
+    this._container.style.borderRadius = '16px';
     this._container.style.display = 'none';
     this._container.style.opacity = '0';
     this._container.style.zIndex = '1500';
+    this._container.style.pointerEvents = 'auto';
 
     const title = document.createElement('h3');
     title.className = 'battle-menu-title';
-    title.innerText = 'Battle Menu';
+    title.innerText = '⚡ BATTLE & EQUIPMENT';
     title.style.margin = '0 0 15px 0';
     title.style.textAlign = 'center';
+    title.style.color = '#00f0ff';
+    title.style.letterSpacing = '1.5px';
+    title.style.fontSize = '16px';
+    title.style.fontWeight = '800';
     this._container.appendChild(title);
 
     const slotsContainer = document.createElement('div');
@@ -47,7 +58,9 @@ export class BattleMenuSystem {
       slot.className = 'battle-menu-slot';
       slot.style.width = '80px';
       slot.style.height = '80px';
-      slot.style.border = '2px solid #555';
+      slot.style.border = '2px solid rgba(0, 229, 255, 0.3)';
+      slot.style.borderRadius = '12px';
+      slot.style.background = 'rgba(255, 255, 255, 0.05)';
       slot.style.display = 'flex';
       slot.style.alignItems = 'center';
       slot.style.justifyContent = 'center';
@@ -66,8 +79,15 @@ export class BattleMenuSystem {
     actions.style.justifyContent = 'center';
     
     const closeBtn = document.createElement('button');
-    closeBtn.innerText = 'Close';
-    closeBtn.style.padding = '8px 16px';
+    closeBtn.className = 'hud-touch-btn';
+    closeBtn.innerText = '✕ Wróć do gry';
+    closeBtn.style.padding = '8px 20px';
+    closeBtn.style.fontSize = '13px';
+    closeBtn.style.pointerEvents = 'auto';
+    closeBtn.addEventListener('pointerup', (e) => {
+      e.preventDefault();
+      this.close();
+    });
     closeBtn.addEventListener('click', () => this.close());
     actions.appendChild(closeBtn);
 
@@ -75,43 +95,64 @@ export class BattleMenuSystem {
     uiContainer.appendChild(this._container);
   }
 
+  toggle() {
+    if (this._active) {
+      this.close();
+    } else {
+      this.open();
+    }
+  }
+
   open() {
-    if (this._active || gameStateManager.state !== GAME_STATES.PLAYING) return;
+    if (this._active) return;
+    const currentState = gameStateManager.state;
+    if (currentState !== GAME_STATES.PLAYING && currentState !== GAME_STATES.SELECTION) return;
     
     this._active = true;
-    this._savedTimeScale = timeManager.timeScale;
-    timeManager.timeScale = GAME_CONFIG?.slowMotion?.scale || 0.1;
+    this._savedState = currentState;
+    this._savedTimeScale = timeManager.targetTimeScale || 1.0;
+    timeManager.targetTimeScale = GAME_CONFIG?.slowMotion?.scale || 0.04;
     gameStateManager.setState(GAME_STATES.SLOW_MOTION_MENU);
 
+    eventBus.emit('battleMenu:stateChanged', { active: true });
+
     this._container.style.display = 'block';
-    
     this._updateSlotDisplay();
 
+    if (typeof anime.remove === 'function') {
+      anime.remove(this._container);
+    }
     anime({
       targets: this._container,
-      translateY: 0,
-      opacity: 1,
-      duration: 400,
-      easing: 'easeOutExpo'
+      translateY: [40, 0],
+      opacity: [0, 1],
+      duration: 350,
+      easing: 'easeOutCubic'
     });
   }
 
   close() {
     if (!this._active) return;
     
+    this._active = false;
+    timeManager.targetTimeScale = this._savedTimeScale || 1.0;
+    if (gameStateManager.state === GAME_STATES.SLOW_MOTION_MENU) {
+      gameStateManager.setState(this._savedState || GAME_STATES.PLAYING);
+    }
+    this._savedState = null;
+    eventBus.emit('battleMenu:stateChanged', { active: false });
+
+    if (typeof anime.remove === 'function') {
+      anime.remove(this._container);
+    }
     anime({
       targets: this._container,
-      translateY: 100,
-      opacity: 0,
-      duration: 300,
-      easing: 'easeInExpo',
+      translateY: [0, 30],
+      opacity: [1, 0],
+      duration: 250,
+      easing: 'easeInCubic',
       complete: () => {
         this._container.style.display = 'none';
-        this._active = false;
-        timeManager.timeScale = this._savedTimeScale;
-        if (gameStateManager.state === GAME_STATES.SLOW_MOTION_MENU) {
-          gameStateManager.setState(GAME_STATES.PLAYING);
-        }
       }
     });
   }
