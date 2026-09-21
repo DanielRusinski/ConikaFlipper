@@ -100,13 +100,27 @@ export class BombSystem {
             eventBus.on('ui:toggleBombTargeting', () => {
                 this.toggleTargeting();
             }),
-            eventBus.on('grid:rebuilt', () => {
-                this._tilesX = GAME_CONFIG.grid.tilesX;
-                this._tilesY = GAME_CONFIG.grid.tilesY;
-                this._tileWidth = this._tableWidth / this._tilesX;
-                this._tileHeight = this._tableHeight / this._tilesY;
+            eventBus.on('grid:rebuilt', (data) => {
+                if (data && data.tileManager) {
+                    this.setTileManager(data.tileManager);
+                } else {
+                    this._tilesX = GAME_CONFIG.grid.tilesX;
+                    this._tilesY = GAME_CONFIG.grid.tilesY;
+                    this._tileWidth = this._tableWidth / this._tilesX;
+                    this._tileHeight = this._tableHeight / this._tilesY;
+                }
             })
         );
+    }
+
+    setTileManager(tileManager) {
+        if (tileManager) {
+            this._tileManager = tileManager;
+        }
+        this._tilesX = GAME_CONFIG.grid.tilesX;
+        this._tilesY = GAME_CONFIG.grid.tilesY;
+        this._tileWidth = this._tableWidth / this._tilesX;
+        this._tileHeight = this._tableHeight / this._tilesY;
     }
 
     _createReticle() {
@@ -425,8 +439,8 @@ export class BombSystem {
         eventBus.emit('bomb:detonated', { x: targetX, z: targetZ, radius: blastRadius });
 
         // Chromatic aberration flash and camera shake for punchy explosion feel
-        eventBus.emit('fx:chromaticAberration', { intensity: 0.022, duration: 0.45 });
-        eventBus.emit('fx:shake', { trauma: 0.55 });
+        eventBus.emit('fx:chromaticAberration', { intensity: 0.055, duration: 0.50, flash: 0.70 });
+        eventBus.emit('fx:shake', { trauma: 0.88 });
 
         // 4. Remove bomb mesh from scene
         this._parentGroup.remove(bomb.group);

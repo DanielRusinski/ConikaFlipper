@@ -31,9 +31,9 @@ export const PERFORMANCE_CONFIG = {
       particleUpdateSkip: 2,
       postProcessing: true,
       bloomEnabled: true,
-      bloomStrength: isMobile ? 0.18 : 0.22,
-      bloomRadius: isMobile ? 0.45 : 0.60,
-      bloomThreshold: 0.84,
+      bloomStrength: 0.62,
+      bloomRadius: 1.05,
+      bloomThreshold: 0.60,
       grainIntensity: 0.04,
       lodDistanceFactor: 0.6,
       updateThrottling: true,
@@ -114,7 +114,7 @@ export const GRAPHICS_CONFIG = {
   pixelRatioCap: isMobile ? 0.82 : 2.0,
   quality: PERFORMANCE_CONFIG.levels,
   toneMapping: 'ACESFilmic',
-  toneMappingExposure: 1.2,
+  toneMappingExposure: 0.62,
   fps: { target: 60, budgetMs: 16.67, minSustained: 50 },
   adaptiveQuality: {
     enabled: true,
@@ -123,7 +123,7 @@ export const GRAPHICS_CONFIG = {
     decreaseFrames: 15,
     increaseFrames: 150
   },
-  fog: { enabled: true, color: 0x2b0015, near: 0.8, far: 2.3 },
+  fog: { enabled: false, color: 0x2b0015, near: 0.8, far: 2.3 },
   transition: { duration: 2600 },
   saturation: 1.0
 };

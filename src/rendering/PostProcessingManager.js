@@ -6,12 +6,15 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { qualityManager } from '../core/QualityManager.js';
 import { eventBus } from '../core/EventBus.js';
+import { GRAPHICS_CONFIG } from '../config/graphicsConfig.js';
 
 const FilmGrainShader = {
     uniforms: {
         tDiffuse: { value: null },
         intensity: { value: 0.04 },
-        chromaticAberration: { value: 0.0 }
+        chromaticAberration: { value: 0.0 },
+        flashIntensity: { value: 0.0 },
+        saturation: { value: 1.0 }
     },
     vertexShader: `
         varying vec2 vUv;
@@ -25,6 +28,8 @@ const FilmGrainShader = {
         uniform sampler2D tDiffuse;
         uniform float intensity;
         uniform float chromaticAberration;
+        uniform float flashIntensity;
+        uniform float saturation;
         varying vec2 vUv;
         
         float random(vec2 co) {
@@ -38,7 +43,7 @@ const FilmGrainShader = {
             if (chromaticAberration > 0.0001) {
                 vec2 dir = vUv - 0.5;
                 float dist = length(dir);
-                vec2 shift = dir * (dist * chromaticAberration * 2.5);
+                vec2 shift = dir * (dist * chromaticAberration * 4.8);
                 float r = texture2D(tDiffuse, vUv - shift).r;
                 float g = texture2D(tDiffuse, vUv).g;
                 float b = texture2D(tDiffuse, vUv + shift).b;
@@ -48,9 +53,23 @@ const FilmGrainShader = {
                 color = texture2D(tDiffuse, vUv);
             }
 
+            // Dynamic Saturation
+            if (abs(saturation - 1.0) > 0.01) {
+                float gray = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+                color.rgb = clamp(mix(vec3(gray), color.rgb, saturation), 0.0, 1.0);
+            }
+
+            // Accompanying flash burst on impacts & explosions
+            if (flashIntensity > 0.0001) {
+                color.rgb += vec3(flashIntensity * 0.95, flashIntensity * 0.98, flashIntensity * 1.15);
+            }
+
             // Single static fixed noise frame - not animated per frame for zero GPU overhead
-            float noise = (random(vUv * 750.0) - 0.5) * intensity;
-            color.rgb += noise;
+            if (intensity > 0.001) {
+                float noise = (random(vUv * 750.0) - 0.5) * intensity;
+                color.rgb += noise;
+            }
+
             gl_FragColor = color;
         }
     `
@@ -74,6 +93,11 @@ export class PostProcessingManager {
         this._chromaticAberration = 0.0;
         this._chromaticDuration = 0.35;
         this._chromaticTimer = 0.0;
+
+        // Dynamic impact flash state
+        this._flashIntensity = 0.0;
+        this._flashDuration = 0.25;
+        this._flashTimer = 0.0;
     }
 
     init(renderer, scene, camera) {
@@ -89,13 +113,18 @@ export class PostProcessingManager {
         this.composer.addPass(this.renderPass);
 
         const resolution = new THREE.Vector2(window.innerWidth, window.innerHeight);
-        this.bloomPass = new UnrealBloomPass(resolution, 0.20, 0.5, 0.84);
-        this.bloomPass.strength = 0.20;
-        this.bloomPass.radius = 0.5;
-        this.bloomPass.threshold = 0.84;
+        this.bloomPass = new UnrealBloomPass(resolution, 0.62, 1.05, 0.60);
+        this.bloomPass.strength = 0.62;
+        this.bloomPass.radius = 1.05;
+        this.bloomPass.threshold = 0.60;
         this.composer.addPass(this.bloomPass);
 
         this.grainPass = new ShaderPass(FilmGrainShader);
+        if (this.grainPass.uniforms.saturation) {
+            this.grainPass.uniforms.saturation.value = (GRAPHICS_CONFIG.saturation !== undefined) 
+                ? GRAPHICS_CONFIG.saturation 
+                : 1.0;
+        }
         this.composer.addPass(this.grainPass);
 
         this.outputPass = new OutputPass();
@@ -111,22 +140,45 @@ export class PostProcessingManager {
             }
         });
 
-        const chromaUnsub = eventBus.on('fx:chromaticAberration', ({ intensity, duration }) => {
-            this.triggerChromaticAberration(intensity, duration);
+        const chromaUnsub = eventBus.on('fx:chromaticAberration', ({ intensity, duration, flash }) => {
+            this.triggerChromaticAberration(intensity, duration, flash);
         });
         this._eventUnsubs.push(chromaUnsub);
+
+        const satUnsub = eventBus.on('graphics:saturationChanged', ({ saturation }) => {
+            this.setSaturation(saturation);
+        });
+        this._eventUnsubs.push(satUnsub);
     }
 
-    triggerChromaticAberration(amount = 0.018, duration = 0.35) {
+    setSaturation(value) {
+        if (this.grainPass && this.grainPass.uniforms.saturation) {
+            this.grainPass.uniforms.saturation.value = (value !== undefined && !isNaN(value)) ? Number(value) : 1.0;
+        }
+    }
+
+    triggerChromaticAberration(amount = 0.035, duration = 0.35, flash = null) {
         this._chromaticAberration = Math.max(this._chromaticAberration, amount);
         this._chromaticDuration = Math.max(0.05, duration);
         this._chromaticTimer = this._chromaticDuration;
+
+        const flashAmount = (flash !== null && flash !== undefined) 
+            ? flash 
+            : Math.min(0.70, amount * 12.0);
+        this._flashIntensity = Math.max(this._flashIntensity, flashAmount);
+        this._flashDuration = Math.max(0.05, duration * 0.85);
+        this._flashTimer = this._flashDuration;
+
         if (this.grainPass && this.grainPass.uniforms.chromaticAberration) {
             this.grainPass.uniforms.chromaticAberration.value = this._chromaticAberration;
+        }
+        if (this.grainPass && this.grainPass.uniforms.flashIntensity) {
+            this.grainPass.uniforms.flashIntensity.value = this._flashIntensity;
         }
     }
 
     update(deltaTime) {
+        let needsUpdate = false;
         if (this._chromaticTimer > 0) {
             this._chromaticTimer -= deltaTime;
             if (this._chromaticTimer <= 0) {
@@ -137,8 +189,27 @@ export class PostProcessingManager {
                 // Quadratic decay for punchy flash falloff
                 this._chromaticAberration = this._chromaticAberration * Math.pow(progress, 2.0);
             }
-            if (this.grainPass && this.grainPass.uniforms.chromaticAberration) {
+            needsUpdate = true;
+        }
+
+        if (this._flashTimer > 0) {
+            this._flashTimer -= deltaTime;
+            if (this._flashTimer <= 0) {
+                this._flashTimer = 0;
+                this._flashIntensity = 0;
+            } else {
+                const fProgress = this._flashTimer / this._flashDuration;
+                this._flashIntensity = this._flashIntensity * Math.pow(fProgress, 2.2);
+            }
+            needsUpdate = true;
+        }
+
+        if (needsUpdate && this.grainPass) {
+            if (this.grainPass.uniforms.chromaticAberration) {
                 this.grainPass.uniforms.chromaticAberration.value = this._chromaticAberration;
+            }
+            if (this.grainPass.uniforms.flashIntensity) {
+                this.grainPass.uniforms.flashIntensity.value = this._flashIntensity;
             }
         }
     }

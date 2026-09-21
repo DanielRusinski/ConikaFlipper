@@ -56,6 +56,24 @@ export class TableSelector {
     this.mesh.visible = false;
     this.mesh.position.set(0, -999, 0);
     parentGroup.add(this.mesh);
+
+    eventBus.on('grid:rebuilt', (data) => {
+      if (data && data.tileManager) {
+        this.setTileManager(data.tileManager);
+      }
+    });
+  }
+
+  setTileManager(tileManager) {
+    if (tileManager) {
+      this._tileManager = tileManager;
+    }
+    this.tilesX = GAME_CONFIG.grid.tilesX;
+    this.tilesY = GAME_CONFIG.grid.tilesY;
+    this.tableWidth = GAME_CONFIG.table.width;
+    this.tableHeight = GAME_CONFIG.table.height;
+    this.tileWidth = this.tableWidth / this.tilesX;
+    this.tileHeight = this.tableHeight / this.tilesY;
   }
 
   activate() {

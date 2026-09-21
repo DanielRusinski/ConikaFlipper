@@ -148,19 +148,42 @@ export class EnemySystem {
             eventBus.on('bomb:detonated', ({ x, z, radius }) => {
                 this._onBombDetonated(x, z, radius);
             }),
-            // Update grid dimensions if resized or rebuilt
-            eventBus.on('grid:rebuilt', () => {
-                this.onGridRebuilt(this._tileManager);
+            // Update grid dimensions and TileManager reference if resized or rebuilt
+            eventBus.on('grid:rebuilt', (data) => {
+                const tm = (data && data.tileManager) ? data.tileManager : this._tileManager;
+                this.onGridRebuilt(tm);
             })
         );
     }
 
+    setTileManager(tileManager) {
+        this.onGridRebuilt(tileManager);
+    }
+
     onGridRebuilt(tileManager) {
-        this._tileManager = tileManager;
+        if (tileManager) {
+            this._tileManager = tileManager;
+        }
         this._tilesX = GAME_CONFIG.grid.tilesX;
         this._tilesY = GAME_CONFIG.grid.tilesY;
         this._tileWidth = this._tableWidth / this._tilesX;
         this._tileHeight = this._tableHeight / this._tilesY;
+
+        // If there are active enemies, update their waypoints, centers, and resolve obstacle collisions immediately
+        if (this._tileManager && this._enemies) {
+            for (const enemy of this._enemies) {
+                if (enemy.isDead) continue;
+                const safe = this._findNearestWalkableCenter(enemy.cx, enemy.cy);
+                enemy.cx = safe.cx;
+                enemy.cy = safe.cy;
+                const cPos = this._tileManager.getTileWorldPos(enemy.cx, enemy.cy);
+                enemy.centerWorld = { x: cPos.x, z: cPos.z };
+                enemy.targetCenterWorld = { x: cPos.x, z: cPos.z };
+                enemy.waypoints = this._calcWaypoints(enemy.cx, enemy.cy);
+                this._resolveObstacleCollisions(enemy);
+                enemy.group.position.set(enemy.x, this._baseFloatHeight, enemy.z);
+            }
+        }
     }
 
     /**
@@ -287,9 +310,8 @@ export class EnemySystem {
         const halfH = (this._tileHeight * 0.92) * 0.5;
 
         // Check 5x5 window around current grid position to catch all neighboring obstacle columns
-        const gridPos = this._tileManager.getTileGridPosFromWorld(enemy.x, enemy.z);
-
-        for (let iter = 0; iter < 2; iter++) { // 2 passes for rock-solid corner resolution
+        for (let iter = 0; iter < 4; iter++) { // 4 passes for rock-solid corner resolution
+            const gridPos = this._tileManager.getTileGridPosFromWorld(enemy.x, enemy.z);
             for (let dy = -2; dy <= 2; dy++) {
                 for (let dx = -2; dx <= 2; dx++) {
                     const gx = gridPos.gridX + dx;
@@ -496,6 +518,10 @@ export class EnemySystem {
             isDead: false
         };
 
+        // Immediately resolve obstacle collisions on spawn so enemy is never placed inside an obstacle
+        this._resolveObstacleCollisions(enemyData);
+        enemyData.group.position.set(enemyData.x, this._baseFloatHeight, enemyData.z);
+
         if (!isDelayed) {
             this._triggerSpawnEffects(enemyData);
         }
@@ -524,8 +550,8 @@ export class EnemySystem {
         }
 
         // Chromatic aberration flash and camera tremor on enemy entrance
-        eventBus.emit('fx:chromaticAberration', { intensity: 0.009, duration: 0.25 });
-        eventBus.emit('fx:shake', { trauma: 0.18 });
+        eventBus.emit('fx:chromaticAberration', { intensity: 0.024, duration: 0.30, flash: 0.35 });
+        eventBus.emit('fx:shake', { trauma: 0.32 });
     }
 
     update(dt) {
@@ -992,6 +1018,10 @@ export class EnemySystem {
         playSound(880, 0.12);
         setTimeout(() => playSound(1320, 0.14), 40);
 
+        // Chromatic aberration flash and camera shake on punchy bumper hit
+        eventBus.emit('fx:chromaticAberration', { intensity: 0.026, duration: 0.22, flash: 0.38 });
+        eventBus.emit('fx:shake', { trauma: 0.38 });
+
         // 8. Award points and notify event bus (+50 pts)
         eventBus.emit('bumper:hit', {
             points: 50,
@@ -1227,8 +1257,8 @@ export class EnemySystem {
         });
 
         // Chromatic aberration and camera shake on enemy destruction
-        eventBus.emit('fx:chromaticAberration', { intensity: 0.015, duration: 0.35 });
-        eventBus.emit('fx:shake', { trauma: 0.35 });
+        eventBus.emit('fx:chromaticAberration', { intensity: 0.045, duration: 0.40, flash: 0.60 });
+        eventBus.emit('fx:shake', { trauma: 0.70 });
 
         // 8. Remove from enemies array
         const idx = this._enemies.indexOf(enemy);

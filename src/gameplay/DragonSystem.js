@@ -127,13 +127,27 @@ export class DragonSystem {
                 const duration = (data && data.duration) || 6;
                 this.summon(duration);
             }),
-            eventBus.on('grid:rebuilt', () => {
-                this._tilesX = GAME_CONFIG.grid.tilesX;
-                this._tilesY = GAME_CONFIG.grid.tilesY;
-                this._tileWidth = this._tableWidth / this._tilesX;
-                this._tileHeight = this._tableHeight / this._tilesY;
+            eventBus.on('grid:rebuilt', (data) => {
+                if (data && data.tileManager) {
+                    this.setTileManager(data.tileManager);
+                } else {
+                    this._tilesX = GAME_CONFIG.grid.tilesX;
+                    this._tilesY = GAME_CONFIG.grid.tilesY;
+                    this._tileWidth = this._tableWidth / this._tilesX;
+                    this._tileHeight = this._tableHeight / this._tilesY;
+                }
             })
         );
+    }
+
+    setTileManager(tileManager) {
+        if (tileManager) {
+            this._tileManager = tileManager;
+        }
+        this._tilesX = GAME_CONFIG.grid.tilesX;
+        this._tilesY = GAME_CONFIG.grid.tilesY;
+        this._tileWidth = this._tableWidth / this._tilesX;
+        this._tileHeight = this._tableHeight / this._tilesY;
     }
 
     summon(duration = 6.0) {

@@ -13,18 +13,18 @@ export class SettingsPanel {
         this._keyHandler = this._handleKeyDown.bind(this);
         this._params = {
             backgroundColor: '#2b0015',
-            fogEnabled: GRAPHICS_CONFIG.fog?.enabled ?? true,
+            fogEnabled: GRAPHICS_CONFIG.fog?.enabled ?? false,
             fogColor: '#2b0015',
             fogNear: GRAPHICS_CONFIG.fog?.near || 1.5,
             fogFar: GRAPHICS_CONFIG.fog?.far || 4.0,
             environmentIntensity: LIGHTING_CONFIG.presets?.sunset?.environment?.intensity || 1.2,
             postProcessing: true,
             bloomEnabled: true,
-            bloomStrength: 0.22,
-            bloomRadius: 0.60,
-            bloomThreshold: 0.84,
-            saturation: GRAPHICS_CONFIG.saturation || 1.0,
-            exposure: GRAPHICS_CONFIG.toneMappingExposure || 1.0,
+            bloomStrength: 0.62,
+            bloomRadius: 1.05,
+            bloomThreshold: 0.60,
+            saturation: GRAPHICS_CONFIG.saturation !== undefined ? GRAPHICS_CONFIG.saturation : 1.0,
+            exposure: GRAPHICS_CONFIG.toneMappingExposure !== undefined ? GRAPHICS_CONFIG.toneMappingExposure : 0.62,
             qualityLevel: qualityManager.level || 'low',
             lightingPreset: LIGHTING_CONFIG.defaultPreset || 'sunset',
             hemiIntensity: LIGHTING_CONFIG.presets?.sunset?.hemisphere?.intensity || 0.7,
@@ -57,7 +57,7 @@ export class SettingsPanel {
             pinkLightDistance: 30,
             blueLightColor: '#3377ff',
             blueLightDistance: 50,
-            ballSpeedMultiplier: 0.4
+            ballSpeedMultiplier: 0.15
         };
     }
     init() {

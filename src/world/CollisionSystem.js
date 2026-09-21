@@ -15,7 +15,7 @@ export class CollisionSystem {
         this._tableHeight = 0;
         this._obstacles = [];
         this._speedMultiplier = 1.0;
-        this._baseSpeedScale = 0.4; // Default ball speed scale set to 0.4 per user request
+        this._baseSpeedScale = 0.15; // Default ball speed scale set to 0.15 (15%) per user request
         this._speedBoostTimer = null;
         this._unsubSpeed = eventBus.on('modifier:speed', ({ value, duration }) => {
             this._speedMultiplier = value || 1.4;
@@ -32,7 +32,7 @@ export class CollisionSystem {
     }
 
     setBaseSpeedScale(scale) {
-        this._baseSpeedScale = Math.max(0.05, Number(scale) || 0.4);
+        this._baseSpeedScale = Math.max(0.05, Number(scale) || 0.15);
     }
 
     getBaseSpeedScale() {
@@ -47,7 +47,7 @@ export class CollisionSystem {
     }
 
     setTilt(angleX, angleY) {
-        const mult = (this._speedMultiplier || 1.0) * (this._baseSpeedScale || 0.4);
+        const mult = (this._speedMultiplier || 1.0) * (this._baseSpeedScale || 0.15);
         this.gx = GAME_CONFIG.physics.gravity * Math.sin(angleX) * mult;
         this.gy = GAME_CONFIG.physics.gravity * Math.sin(angleY) * mult;
     }
@@ -67,7 +67,7 @@ export class CollisionSystem {
         this.vy *= damp;
         
         const speedSq = this.vx * this.vx + this.vy * this.vy;
-        const currentMaxSpeed = GAME_CONFIG.physics.maxSpeed * (this._speedMultiplier || 1.0) * (this._baseSpeedScale || 0.4);
+        const currentMaxSpeed = GAME_CONFIG.physics.maxSpeed * (this._speedMultiplier || 1.0) * (this._baseSpeedScale || 0.15);
         const maxSpeedSq = currentMaxSpeed * currentMaxSpeed;
         if (speedSq > maxSpeedSq) {
             const speed = Math.sqrt(speedSq);

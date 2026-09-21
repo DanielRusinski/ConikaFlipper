@@ -41,7 +41,7 @@ export class CentipedeSystem {
         // Lifecycle & stage timing
         this.state = 'inactive'; // 'inactive' | 'spawning' | 'active' | 'dead'
         this._stageTimer = 0.0;
-        this._spawnTargetTime = 90.0; // 1.5 minutes
+        this._spawnTargetTime = 20.0; // 20 seconds per stage
         this._spawnDuration = 0.45;   // Subdued, fast entrance
         this._spawnTimer = 0.0;
         this._respawnDelay = 7.0;     // Continuous respawn delay after all 8 segments destroyed
@@ -155,14 +155,36 @@ export class CentipedeSystem {
         }
 
         this._unsubs.push(
-            eventBus.on('bomb:detonated', (data) => this._onBombDetonated(data)),
-            eventBus.on('grid:rebuilt', () => {
-                this._tilesX = GAME_CONFIG.grid.tilesX;
-                this._tilesY = GAME_CONFIG.grid.tilesY;
-                this._tileWidth = this._tableWidth / this._tilesX;
-                this._tileHeight = this._tableHeight / this._tilesY;
+            eventBus.on('bomb:detonated', (data) => {
+                this._onBombDetonated(data);
+            }),
+            eventBus.on('grid:rebuilt', (data) => {
+                if (data && data.tileManager) {
+                    this.setTileManager(data.tileManager);
+                } else {
+                    this._tilesX = GAME_CONFIG.grid.tilesX;
+                    this._tilesY = GAME_CONFIG.grid.tilesY;
+                    this._tileWidth = this._tableWidth / this._tilesX;
+                    this._tileHeight = this._tableHeight / this._tilesY;
+                }
             })
         );
+    }
+
+    setTileManager(tileManager, parentGroup = null) {
+        if (parentGroup) {
+            this._parentGroup = parentGroup;
+        }
+        if (this._parentGroup && !this._parentGroup.children.includes(this.group)) {
+            this._parentGroup.add(this.group);
+        }
+        if (tileManager) {
+            this._tileManager = tileManager;
+        }
+        this._tilesX = GAME_CONFIG.grid.tilesX;
+        this._tilesY = GAME_CONFIG.grid.tilesY;
+        this._tileWidth = this._tableWidth / this._tilesX;
+        this._tileHeight = this._tableHeight / this._tilesY;
     }
 
     setExternalSystems(enemySystem, laserHazardSystem) {
@@ -312,9 +334,13 @@ export class CentipedeSystem {
         eventBus.emit('centipede:spawned', { x: this._headX, z: this._headZ });
     }
 
-    _onBombDetonated({ x, z, radius }) {
+    _onBombDetonated(data) {
+        if (!data) return;
+        const { x, z, radius } = data;
         if (this.state !== 'active' && this.state !== 'spawning') return;
 
+        const blastRadius = (radius !== undefined && radius > 0) ? radius : (this._tileWidth * 3.4);
+        const hitMargin = this._tileWidth * 0.50;
         let hitCount = 0;
         let lastHitPos = null;
 
@@ -322,9 +348,9 @@ export class CentipedeSystem {
             if (!seg.alive) continue;
 
             const dist = Math.hypot(seg.x - x, seg.z - z);
-            if (dist <= radius + this._tileWidth * 0.46) {
+            if (dist <= blastRadius + hitMargin) {
                 seg.alive = false;
-                seg.group.visible = false;
+                if (seg.group) seg.group.visible = false;
                 hitCount++;
                 lastHitPos = { x: seg.x, z: seg.z };
 
@@ -346,8 +372,8 @@ export class CentipedeSystem {
         }
 
         if (hitCount > 0) {
-            eventBus.emit('fx:chromaticAberration', { intensity: 0.016, duration: 0.35 });
-            eventBus.emit('fx:shake', { trauma: 0.35 });
+            eventBus.emit('fx:chromaticAberration', { intensity: 0.038, duration: 0.35, flash: 0.45 });
+            eventBus.emit('fx:shake', { trauma: 0.60 });
 
             const remainingAlive = this._segments.filter(s => s.alive).length;
             if (remainingAlive === 0) {
@@ -367,15 +393,20 @@ export class CentipedeSystem {
         setTimeout(() => playSound(1980, 0.40), 200);
         setTimeout(() => playSound(2600, 0.45), 330);
 
-        // Big floating score label +1000 BONUS
+        // Big floating score label +1000 BONUS and time bonus label +60s
         this._createScoreLabel(pos.x, pos.z, '+1000 BONUS');
+        setTimeout(() => {
+            this._createScoreLabel(pos.x, pos.z + 0.035, '+60s CZAS ⏱️');
+        }, 180);
 
         // Award grand elimination bonus
         eventBus.emit('score:add', { points: 1000, reason: 'centipede_defeated' });
+        // Award +1 minute (+60 seconds) to game timer!
+        eventBus.emit('timer:add', { seconds: 60, reason: 'centipede_defeated' });
         eventBus.emit('centipede:defeated', { stageTimer: this._stageTimer });
 
-        eventBus.emit('fx:chromaticAberration', { intensity: 0.024, duration: 0.50 });
-        eventBus.emit('fx:shake', { trauma: 0.50 });
+        eventBus.emit('fx:chromaticAberration', { intensity: 0.055, duration: 0.55, flash: 0.70 });
+        eventBus.emit('fx:shake', { trauma: 0.90 });
     }
 
     _createScoreLabel(x, z, text) {

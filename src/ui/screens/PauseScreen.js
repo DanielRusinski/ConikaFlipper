@@ -28,9 +28,9 @@ export class PauseScreen {
         <div class="pause-speed-box" style="margin: 12px auto; max-width: 230px; background: rgba(255,255,255,0.06); padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.14); text-align:left;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:12px; font-weight:700;">
             <span style="color:#ddd;">⚡ Prędkość bili / Speed</span>
-            <span id="pause-speed-val" style="color:#00ffcc; font-weight:800;">40%</span>
+            <span id="pause-speed-val" style="color:#00ffcc; font-weight:800;">15%</span>
           </div>
-          <input type="range" id="pause-speed-slider" min="10" max="150" value="40" step="5" style="width:100%; cursor:pointer; accent-color:#00ffcc; touch-action:manipulation; display:block;">
+          <input type="range" id="pause-speed-slider" min="5" max="150" value="15" step="5" style="width:100%; cursor:pointer; accent-color:#00ffcc; touch-action:manipulation; display:block;">
         </div>
 
         <button id="pause-settings-btn" class="screen-btn secondary" style="display:block; width:100%; max-width:230px; margin:0 auto 10px; padding:12px; font-size:15px; font-weight:600; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:10px; cursor:pointer; touch-action:manipulation; pointer-events:auto;">Więcej opcji / Settings</button>

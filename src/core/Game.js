@@ -74,9 +74,10 @@ export class Game {
 
         // Pre-allocated reusable objects for game loop
         this._cameraTargetPos = new THREE.Vector3();
-        this._tempVec2 = new THREE.Vector2();
-        this._tableCenterX = GAME_CONFIG.table.width / 2;
-        this._tableCenterZ = GAME_CONFIG.table.height / 2;
+        this._tableWidth = GAME_CONFIG.table?.width || 0.513;
+        this._tableHeight = GAME_CONFIG.table?.height || 1.07;
+        this._tableCenterX = this._tableWidth / 2;
+        this._tableCenterZ = this._tableHeight / 2;
 
         // Camera state & fluid zoom
         this._currentCamPos = { x: 0, y: GAME_CONFIG.camera.height, z: GAME_CONFIG.camera.zOffset };
@@ -468,6 +469,24 @@ export class Game {
                 playSound(1600, 0.25);
             }
         });
+        eventBus.on('timer:add', ({ seconds }) => {
+            if (seconds && seconds > 0) {
+                const addedSeconds = Number(seconds);
+                this._gameTimer += addedSeconds;
+                
+                const mins = Math.floor(this._gameTimer / 60);
+                const secs = Math.floor(this._gameTimer % 60);
+                this._gameTimerFormatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                
+                eventBus.emit('timer:changed', {
+                    time: this._gameTimer,
+                    formatted: this._gameTimerFormatted,
+                    added: addedSeconds
+                });
+
+                playSound(1600, 0.25);
+            }
+        });
 
         // State changes
         eventBus.on('state:changed', ({ state, previousState }) => {
@@ -650,11 +669,11 @@ export class Game {
 
         // Update camera trauma shake decay
         if (this._camTrauma > 0) {
-            this._camTrauma = Math.max(0, this._camTrauma - delta * 2.8);
-            const shake = (this._camTrauma * this._camTrauma) * 0.024;
+            this._camTrauma = Math.max(0, this._camTrauma - delta * 2.4);
+            const shake = (this._camTrauma * this._camTrauma) * 0.055;
             this._camShakeOffset.set(
                 (Math.random() * 2 - 1) * shake,
-                (Math.random() * 2 - 1) * (shake * 0.5),
+                (Math.random() * 2 - 1) * (shake * 0.6),
                 (Math.random() * 2 - 1) * shake
             );
         } else {
@@ -788,6 +807,13 @@ export class Game {
             // Smooth zoom dampening
             this._cameraZoom += (this._targetCameraZoom - this._cameraZoom) * Math.min(delta * 5.0, 1.0);
 
+            // Dynamically restore standard gameplay FOV (45 deg)
+            if (this.camera && Math.abs(this.camera.fov - 45) > 0.05) {
+                const fovLerp = 1.0 - Math.exp(-3.5 * delta);
+                this.camera.fov += (45 - this.camera.fov) * fovLerp;
+                this.camera.updateProjectionMatrix();
+            }
+
             // Battle camera zoom progress (smooth transition in/out of bullet-time close-up)
             this._targetBattleCameraProgress = (isSlowMo || isModifierSelect) ? 1.0 : 0.0;
             const battleLerpRate = 1.0 - Math.exp(-5.0 * delta);
@@ -876,23 +902,58 @@ export class Game {
             this.tableSelector.update(timestamp);
             this._cameraZoom += (this._targetCameraZoom - this._cameraZoom) * Math.min(delta * 5.0, 1.0);
 
-            // Elevated table overview camera during tile selection (start of board and respawn)
-            // Framed close to the table showing almost entire table (-10% top, -10% bottom trimmed)
+            // Level / flatten the board vertically and horizontally (pitch=0, roll=0, yaw=0)
+            this._currentTiltX = 0;
+            this._currentTiltY = 0;
+            const tiltLerp = 1.0 - Math.exp(-9.0 * delta);
+            this.boardGroup.rotation.x += (0 - this.boardGroup.rotation.x) * tiltLerp;
+            this.boardGroup.rotation.z += (0 - this.boardGroup.rotation.z) * tiltLerp;
+            this.boardGroup.rotation.y += (0 - this.boardGroup.rotation.y) * tiltLerp;
+
+            // Dynamically adjust FOV towards ~38 deg for a clean, distortion-free top-down orthogonal view
+            const targetFov = 38;
+            if (this.camera && Math.abs(this.camera.fov - targetFov) > 0.05) {
+                const fovLerp = 1.0 - Math.exp(-3.5 * delta);
+                this.camera.fov += (targetFov - this.camera.fov) * fovLerp;
+                this.camera.updateProjectionMatrix();
+            }
+
+            // Top-down camera height calculated so the entire board (all 18x36 tiles) fits on screen
+            // with comfortable margins on any display (portrait phone, tablet, landscape PC)
+            const tableW = this._tableWidth || GAME_CONFIG.table?.width || 0.513;
+            const tableH = this._tableHeight || GAME_CONFIG.table?.height || 1.07;
+            const aspect = this.camera ? (this.camera.aspect || (window.innerWidth / window.innerHeight)) : 1.0;
+            const fovRad = (this.camera ? (this.camera.fov || 38) : 38) * Math.PI / 180;
+            const halfFovTan = Math.tan(fovRad / 2);
+
+            const halfSpanZ = (tableH * 0.5) * 1.25;
+            const halfSpanX = (tableW * 0.5) * 1.25;
+
+            const heightForZ = halfSpanZ / halfFovTan;
+            const heightForX = halfSpanX / (aspect * halfFovTan);
+            const topDownHeight = Math.max(heightForZ, heightForX) * (this._cameraZoom || 1.0);
+
+            // High-angle almost orthogonal top-down position (near 79 degrees, avoiding gimbal lock singularity)
             const camTargetX = 0;
-            const camTargetY = 0.98 * this._cameraZoom;
-            const camTargetZ = 0.24 * this._cameraZoom;
+            const camTargetY = topDownHeight;
+            const camTargetZ = topDownHeight * 0.20;
 
             const camLerp = 1.0 - Math.exp(-GAME_CONFIG.camera.lerpSpeed * delta);
             this._currentCamPos.x += (camTargetX - this._currentCamPos.x) * camLerp;
             this._currentCamPos.y += (camTargetY - this._currentCamPos.y) * camLerp;
             this._currentCamPos.z += (camTargetZ - this._currentCamPos.z) * camLerp;
 
+            // Defensive check against NaN
+            if (isNaN(this._currentCamPos.x) || isNaN(this._currentCamPos.y) || isNaN(this._currentCamPos.z)) {
+                this._currentCamPos = { x: 0, y: 1.85, z: 0.38 };
+            }
+
             this.camera.position.set(
                 this._currentCamPos.x + this._camShakeOffset.x,
                 this._currentCamPos.y + this._camShakeOffset.y,
                 this._currentCamPos.z + this._camShakeOffset.z
             );
-            this._targetCamLookAt.set(0, 0, 0.03);
+            this._targetCamLookAt.set(0, 0, 0.02);
             this._camLookAt.lerp(this._targetCamLookAt, camLerp);
             this.camera.lookAt(this._camLookAt);
 
@@ -1092,6 +1153,14 @@ export class Game {
             this.ballController.deactivate();
         }
 
+        // High-energy trauma shake & chromatic burst on ball loss
+        this.triggerCameraShake(0.85);
+        eventBus.emit('fx:chromaticAberration', { intensity: 0.048, duration: 0.50, flash: 0.60 });
+
+        // Instantly start leveling the board
+        this._currentTiltX = 0;
+        this._currentTiltY = 0;
+
         const remainingLives = this.ballLifeSystem.loseLife();
 
         // Player loses ball: reset active bombs and dismiss dragon companion immediately
@@ -1117,6 +1186,11 @@ export class Game {
     respawnEntryPhase(isRespawn = false) {
         this.screenManager.hideAll();
         this.gameHUD.show();
+
+        // Zero out tilt and level board completely so player can comfortably position ball
+        this._currentTiltX = 0;
+        this._currentTiltY = 0;
+        this.boardGroup.rotation.set(0, 0, 0);
 
         // Ensure bombs and dragon companion are reset on respawn
         if (this.bombSystem) {
@@ -1427,6 +1501,23 @@ export class Game {
         const aabbs = this._buildObstacleAABBs(obstacles);
         this.collisionSystem.setObstacles(aabbs);
 
+        // Update all gameplay systems with the new TileManager instance
+        if (this.tableSelector) {
+            this.tableSelector.setTileManager(this.tileManager);
+        }
+        if (this.bombSystem) {
+            this.bombSystem.setTileManager(this.tileManager);
+        }
+        if (this.dragonSystem) {
+            this.dragonSystem.setTileManager(this.tileManager);
+        }
+        if (this.enemySystem) {
+            this.enemySystem.setTileManager(this.tileManager);
+        }
+        if (this.centipedeSystem) {
+            this.centipedeSystem.setTileManager(this.tileManager, this.boardGroup);
+        }
+
         // Reset ball
         const spawnX = (GAME_CONFIG.spawn.defaultGridX + 0.5) * (GAME_CONFIG.table.width / GAME_CONFIG.grid.tilesX);
         const spawnY = (GAME_CONFIG.spawn.defaultGridY + 0.5) * (GAME_CONFIG.table.height / GAME_CONFIG.grid.tilesY);
@@ -1434,7 +1525,8 @@ export class Game {
 
         eventBus.emit('grid:rebuilt', {
             tilesX: GAME_CONFIG.grid.tilesX,
-            tilesY: GAME_CONFIG.grid.tilesY
+            tilesY: GAME_CONFIG.grid.tilesY,
+            tileManager: this.tileManager
         });
 
         if (this.findingSystem) {

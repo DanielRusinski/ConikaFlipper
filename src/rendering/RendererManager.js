@@ -32,7 +32,9 @@ export class RendererManager {
         };
         
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = GRAPHICS_CONFIG.toneMappingExposure || 1.2;
+        this.renderer.toneMappingExposure = (GRAPHICS_CONFIG.toneMappingExposure !== undefined) 
+            ? GRAPHICS_CONFIG.toneMappingExposure 
+            : 0.62;
         
         const defaultPreset = LIGHTING_CONFIG.presets[LIGHTING_CONFIG.defaultPreset];
         if (defaultPreset && defaultPreset.background) {
@@ -52,6 +54,8 @@ export class RendererManager {
                 GRAPHICS_CONFIG.fog.near,
                 GRAPHICS_CONFIG.fog.far
             );
+        } else {
+            this.scene.fog = null;
         }
 
         // Listen for real-time adaptive quality changes

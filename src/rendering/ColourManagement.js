@@ -30,7 +30,7 @@ class ColourManagement {
             ? toneMappingMap[GRAPHICS_CONFIG.toneMapping] 
             : THREE.ACESFilmicToneMapping;
             
-        this.renderer.toneMappingExposure = GRAPHICS_CONFIG.toneMappingExposure || 1.0;
+        this.renderer.toneMappingExposure = GRAPHICS_CONFIG.toneMappingExposure !== undefined ? GRAPHICS_CONFIG.toneMappingExposure : 0.62;
         this.saturation = GRAPHICS_CONFIG.saturation !== undefined ? GRAPHICS_CONFIG.saturation : 1.0;
     }
 
