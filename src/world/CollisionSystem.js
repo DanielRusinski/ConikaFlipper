@@ -15,6 +15,7 @@ export class CollisionSystem {
         this._tableHeight = 0;
         this._obstacles = [];
         this._speedMultiplier = 1.0;
+        this._baseSpeedScale = 0.4; // Default ball speed scale set to 0.4 per user request
         this._speedBoostTimer = null;
         this._unsubSpeed = eventBus.on('modifier:speed', ({ value, duration }) => {
             this._speedMultiplier = value || 1.4;
@@ -23,6 +24,19 @@ export class CollisionSystem {
                 this._speedMultiplier = 1.0;
             }, (duration || 15) * 1000);
         });
+        this._unsubSettings = eventBus.on('settings:changed', ({ key, value }) => {
+            if (key === 'ballSpeedMultiplier') {
+                this.setBaseSpeedScale(value);
+            }
+        });
+    }
+
+    setBaseSpeedScale(scale) {
+        this._baseSpeedScale = Math.max(0.05, Number(scale) || 0.4);
+    }
+
+    getBaseSpeedScale() {
+        return this._baseSpeedScale;
     }
 
     init(tableWidth, tableHeight, ballRadius) {
@@ -33,7 +47,7 @@ export class CollisionSystem {
     }
 
     setTilt(angleX, angleY) {
-        const mult = this._speedMultiplier || 1.0;
+        const mult = (this._speedMultiplier || 1.0) * (this._baseSpeedScale || 0.4);
         this.gx = GAME_CONFIG.physics.gravity * Math.sin(angleX) * mult;
         this.gy = GAME_CONFIG.physics.gravity * Math.sin(angleY) * mult;
     }
@@ -53,7 +67,7 @@ export class CollisionSystem {
         this.vy *= damp;
         
         const speedSq = this.vx * this.vx + this.vy * this.vy;
-        const currentMaxSpeed = GAME_CONFIG.physics.maxSpeed * (this._speedMultiplier || 1.0);
+        const currentMaxSpeed = GAME_CONFIG.physics.maxSpeed * (this._speedMultiplier || 1.0) * (this._baseSpeedScale || 0.4);
         const maxSpeedSq = currentMaxSpeed * currentMaxSpeed;
         if (speedSq > maxSpeedSq) {
             const speed = Math.sqrt(speedSq);
@@ -217,6 +231,10 @@ export class CollisionSystem {
         if (this._unsubSpeed) {
             this._unsubSpeed();
             this._unsubSpeed = null;
+        }
+        if (this._unsubSettings) {
+            this._unsubSettings();
+            this._unsubSettings = null;
         }
         this._obstacles = [];
         this.active = false;

@@ -41,7 +41,7 @@ export class RendererManager {
             this.scene.background = bgCol;
         }
         
-        const initialLevel = GRAPHICS_CONFIG.isMobile ? 'medium' : 'high';
+        const initialLevel = 'low';
         const initialConfig = (PERFORMANCE_CONFIG.levels && PERFORMANCE_CONFIG.levels[initialLevel]) || {};
         this.setQuality(initialConfig);
         this.renderer.setSize(window.innerWidth, window.innerHeight);

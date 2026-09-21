@@ -29,12 +29,12 @@ export const PERFORMANCE_CONFIG = {
       particlesMax: 60,
       particleLifetime: 0.35,
       particleUpdateSkip: 2,
-      postProcessing: false,
-      bloomEnabled: false,
-      bloomStrength: 0,
-      bloomRadius: 0,
-      bloomThreshold: 1.0,
-      grainIntensity: 0,
+      postProcessing: true,
+      bloomEnabled: true,
+      bloomStrength: isMobile ? 0.18 : 0.22,
+      bloomRadius: isMobile ? 0.45 : 0.60,
+      bloomThreshold: 0.84,
+      grainIntensity: 0.04,
       lodDistanceFactor: 0.6,
       updateThrottling: true,
       maxActiveCrystalsVisible: 15,
@@ -123,7 +123,7 @@ export const GRAPHICS_CONFIG = {
     decreaseFrames: 15,
     increaseFrames: 150
   },
-  fog: { enabled: true, color: 0x1a1a2e, near: 0.8, far: 2.3 },
+  fog: { enabled: true, color: 0x2b0015, near: 0.8, far: 2.3 },
   transition: { duration: 2600 },
   saturation: 1.0
 };

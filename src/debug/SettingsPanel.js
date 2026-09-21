@@ -12,29 +12,29 @@ export class SettingsPanel {
         this._visible = false;
         this._keyHandler = this._handleKeyDown.bind(this);
         this._params = {
-            backgroundColor: '#1a1a2e',
+            backgroundColor: '#2b0015',
             fogEnabled: GRAPHICS_CONFIG.fog?.enabled ?? true,
-            fogColor: '#1a1a2e',
+            fogColor: '#2b0015',
             fogNear: GRAPHICS_CONFIG.fog?.near || 1.5,
             fogFar: GRAPHICS_CONFIG.fog?.far || 4.0,
-            environmentIntensity: 1.0,
+            environmentIntensity: LIGHTING_CONFIG.presets?.sunset?.environment?.intensity || 1.2,
             postProcessing: true,
             bloomEnabled: true,
-            bloomStrength: 0.35,
-            bloomRadius: 1.00,
-            bloomThreshold: 0.80,
+            bloomStrength: 0.22,
+            bloomRadius: 0.60,
+            bloomThreshold: 0.84,
             saturation: GRAPHICS_CONFIG.saturation || 1.0,
             exposure: GRAPHICS_CONFIG.toneMappingExposure || 1.0,
-            qualityLevel: qualityManager.level || 'high',
-            lightingPreset: LIGHTING_CONFIG.defaultPreset || 'vivid',
-            hemiIntensity: LIGHTING_CONFIG.presets?.vivid?.hemisphere?.intensity || 0.6,
-            hemiSkyColor: '#ffffff',
-            hemiGroundColor: '#444444',
-            dirIntensity: LIGHTING_CONFIG.presets?.vivid?.directional?.intensity || 1.2,
-            dirColor: '#ffffff',
-            dirPosX: LIGHTING_CONFIG.presets?.vivid?.directional?.position?.x || 5,
-            dirPosY: LIGHTING_CONFIG.presets?.vivid?.directional?.position?.y || 10,
-            dirPosZ: LIGHTING_CONFIG.presets?.vivid?.directional?.position?.z || 5,
+            qualityLevel: qualityManager.level || 'low',
+            lightingPreset: LIGHTING_CONFIG.defaultPreset || 'sunset',
+            hemiIntensity: LIGHTING_CONFIG.presets?.sunset?.hemisphere?.intensity || 0.7,
+            hemiSkyColor: '#ff8c00',
+            hemiGroundColor: '#4b0082',
+            dirIntensity: LIGHTING_CONFIG.presets?.sunset?.directional?.intensity || 1.6,
+            dirColor: '#ff6347',
+            dirPosX: LIGHTING_CONFIG.presets?.sunset?.directional?.position?.x || -1.5,
+            dirPosY: LIGHTING_CONFIG.presets?.sunset?.directional?.position?.y || 3.0,
+            dirPosZ: LIGHTING_CONFIG.presets?.sunset?.directional?.position?.z || 2.0,
             tilesX: GAME_CONFIG.grid?.tilesX || 18,
             tilesY: GAME_CONFIG.grid?.tilesY || 36,
             obstacleDensity: GAME_CONFIG.obstacles?.density || 0.08,
@@ -46,8 +46,8 @@ export class SettingsPanel {
             targetFps: GRAPHICS_CONFIG.fps?.target || 60,
             adaptiveQuality: GRAPHICS_CONFIG.adaptiveQuality?.enabled ?? true,
             maxPixelRatio: GRAPHICS_CONFIG.pixelRatioCap || 2,
-            currentQualityTier: 'high',
-            shadowsEnabled: true,
+            currentQualityTier: 'low',
+            shadowsEnabled: false,
             pointLightsEnabled: true,
             pointLightsAutoCycle: true,
             pointLightsIntensity: 2.0,
@@ -56,7 +56,8 @@ export class SettingsPanel {
             pinkLightColor: '#ff44aa',
             pinkLightDistance: 30,
             blueLightColor: '#3377ff',
-            blueLightDistance: 50
+            blueLightDistance: 50,
+            ballSpeedMultiplier: 0.4
         };
     }
     init() {
@@ -70,6 +71,9 @@ export class SettingsPanel {
     }
     _createPane() {
         this._pane = new Pane({ title: 'Settings' });
+
+        const closeBtn = this._pane.addButton({ title: '✕ Zamknij / Close Settings' });
+        closeBtn.on('click', () => this.hide());
 
         const bloomFolder = this._pane.addFolder({ title: 'Bloom / Blask', expanded: true });
         bloomFolder.addBinding(this._params, 'bloomEnabled', { label: 'Bloom Active' });
@@ -144,9 +148,15 @@ export class SettingsPanel {
         const spawnCentipedeBtn = worldFolder.addButton({ title: 'Spawn Centipede (🐛)' });
         spawnCentipedeBtn.on('click', () => eventBus.emit('request:spawnCentipede'));
         
-        const ballFolder = this._pane.addFolder({ title: 'Ball', expanded: false });
+        const ballFolder = this._pane.addFolder({ title: 'Ball / Bila', expanded: true });
         ballFolder.addBinding(this._params, 'ballType', { options: { brass: 'brass', marble: 'marble', wood: 'wood' }});
         ballFolder.addBinding(this._params, 'ghostSilhouette');
+        ballFolder.addBinding(this._params, 'ballSpeedMultiplier', {
+            label: 'Ball Speed / Prędkość Bili',
+            min: 0.10,
+            max: 1.50,
+            step: 0.05
+        });
         
         const devFolder = this._pane.addFolder({ title: 'Developer Graphics', expanded: false });
         devFolder.addBinding(this._params, 'targetFps', { readonly: true });

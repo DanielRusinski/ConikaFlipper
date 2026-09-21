@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GRAPHICS_CONFIG } from '../config/graphicsConfig.js';
+import { qualityManager } from '../core/QualityManager.js';
 import { eventBus } from '../core/EventBus.js';
 
 export class ShadowSystem {
@@ -32,6 +33,10 @@ export class ShadowSystem {
         this.keyLight.shadow.camera.top = dY;
         this.keyLight.shadow.camera.bottom = -dY;
         this.keyLight.shadow.camera.updateProjectionMatrix();
+
+        if (qualityManager && qualityManager.config) {
+            this.setQuality(qualityManager.config);
+        }
 
         this._qualityUnsub = eventBus.on('quality:changed', ({ config }) => {
             if (config) {

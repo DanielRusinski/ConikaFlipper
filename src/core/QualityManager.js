@@ -12,9 +12,8 @@ const LEVEL_ORDER = ['low', 'medium', 'high', 'ultra'];
 
 class QualityManager {
   constructor() {
-    const isMobile = GRAPHICS_CONFIG.isMobile;
-    // Initial tier: MEDIUM for mobile (optimal 60 FPS safety), HIGH for desktop
-    this.level = isMobile ? QUALITY_LEVELS.MEDIUM : QUALITY_LEVELS.HIGH;
+    // Initial tier: LOW per user request (with postprocessing & bloom enabled)
+    this.level = QUALITY_LEVELS.LOW;
     this.config = PERFORMANCE_CONFIG.levels[this.level] || GRAPHICS_CONFIG.quality[this.level];
 
     this._autoEnabled = true;
@@ -164,7 +163,7 @@ class QualityManager {
   }
 
   dispose() {
-    this.level = QUALITY_LEVELS.HIGH;
+    this.level = QUALITY_LEVELS.LOW;
     this.config = PERFORMANCE_CONFIG.levels[this.level];
     this._userPreference = null;
     this._fpsBuffer.fill(0);

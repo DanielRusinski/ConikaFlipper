@@ -433,10 +433,10 @@ export class BombSystem {
         if (bomb.ringMesh && bomb.ringMesh.material) bomb.ringMesh.material.dispose();
         if (bomb.sphereMesh && bomb.sphereMesh.material) bomb.sphereMesh.material.dispose();
 
-        // 5. UN-MARK / UN-CONQUER all tiles within explosion blast radius!
-        // "upewnij sie ze bomby po wybuchu odznaczaja kafelki"
+        // 5. UNCOVER / CONQUER all tiles within explosion blast radius!
+        // Bomb explosion assists the player by conquering/revealing tiles in the blast zone
         if (this._tileManager) {
-            this._tileManager.unconquerTilesInRadius(targetX, targetZ, blastRadius);
+            this._tileManager.conquerTilesInRadius(targetX, targetZ, blastRadius);
         }
 
         // 6. Check player ball proximity! If ball is within explosion radius -> instant destruction

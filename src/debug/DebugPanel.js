@@ -22,7 +22,7 @@ export class DebugPanel {
             textures: 0,
             geometries: 0,
             pixelRatio: 1,
-            qualityTier: 'high',
+            qualityTier: 'low',
             currentState: 'NONE',
             ballX: 0,
             ballY: 0,

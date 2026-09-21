@@ -1,5 +1,5 @@
 export const LIGHTING_CONFIG = {
-  defaultPreset: 'vivid',
+  defaultPreset: 'sunset',
   presets: {
     vivid: {
       hemisphere: { skyColor: 0xffffff, groundColor: 0x444444, intensity: 0.45 },

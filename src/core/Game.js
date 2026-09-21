@@ -545,6 +545,8 @@ export class Game {
                 if (this.lightingSystem) this.lightingSystem.setBlueLightDistance(value);
             } else if (key === 'pointLightsAutoCycle') {
                 if (this.lightingSystem) this.lightingSystem.setPointLightsAutoCycle(value);
+            } else if (key === 'ballSpeedMultiplier') {
+                if (this.collisionSystem) this.collisionSystem.setBaseSpeedScale(value);
             }
         });
 

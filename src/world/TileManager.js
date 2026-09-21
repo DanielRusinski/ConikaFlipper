@@ -270,8 +270,67 @@ export class TileManager {
     }
 
     /**
+     * Conquers / uncovers all playable tiles within a blast radius.
+     * Used by bombs on explosion to assist the player in uncovering tiles.
+     */
+    conquerTilesInRadius(centerWorldX, centerWorldZ, radiusWorld) {
+        if (!this.instancedMesh) return [];
+        const newlyDiscovered = [];
+        const radSq = radiusWorld * radiusWorld;
+
+        const { gridX: centerGX, gridY: centerGY } = this.getTileGridPosFromWorld(centerWorldX, centerWorldZ);
+        const cellRadiusX = Math.ceil(radiusWorld / this.tileWidth) + 1;
+        const cellRadiusY = Math.ceil(radiusWorld / this.tileHeight) + 1;
+
+        for (let gy = Math.max(0, centerGY - cellRadiusY); gy <= Math.min(this.tilesY - 1, centerGY + cellRadiusY); gy++) {
+            for (let gx = Math.max(0, centerGX - cellRadiusX); gx <= Math.min(this.tilesX - 1, centerGX + cellRadiusX); gx++) {
+                const index = this.getTileIndex(gx, gy);
+                if (this.isObstacle(gx, gy)) continue;
+
+                const pos = this.getTileWorldPos(gx, gy);
+                const dx = pos.x - centerWorldX;
+                const dz = pos.z - centerWorldZ;
+                if (dx * dx + dz * dz <= radSq) {
+                    if (!this.visitedTiles.has(index)) {
+                        this.visitedTiles.add(index);
+                        this.activeFlashes.set(index, 1.0);
+                        this.instancedMesh.setColorAt(index, this._flashColor);
+                        newlyDiscovered.push({ index, gridX: gx, gridY: gy, x: pos.x, z: pos.z });
+
+                        eventBus.emit('tile:discovered', {
+                            gridX: gx,
+                            gridY: gy,
+                            index,
+                            tileIndex: index,
+                            x: pos.x,
+                            z: pos.z,
+                            fromBomb: true
+                        });
+                    }
+                }
+            }
+        }
+
+        if (newlyDiscovered.length > 0) {
+            this.instancedMesh.instanceColor.needsUpdate = true;
+            this.emitTilesChanged();
+
+            const totalPlayable = this.getTotalPlayableTiles();
+            const totalDiscovered = this.visitedTiles.size;
+            const remaining = Math.max(0, totalPlayable - totalDiscovered);
+
+            if (remaining === 0 && totalPlayable > 0) {
+                eventBus.emit('stage:completed', {
+                    discovered: totalDiscovered,
+                    total: totalPlayable
+                });
+            }
+        }
+        return newlyDiscovered;
+    }
+
+    /**
      * Un-conquers / un-marks tiles within a blast radius (reverting to default silver).
-     * Used by bombs on explosion.
      */
     unconquerTilesInRadius(centerWorldX, centerWorldZ, radiusWorld) {
         if (!this.instancedMesh) return [];
