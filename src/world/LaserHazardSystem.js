@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { GAME_CONFIG } from '../config/gameConfig.js';
 import { eventBus } from '../core/EventBus.js';
 import { playSound } from '../soundfx.js';
+import { bufferGeometryFactory } from '../rendering/BufferGeometryFactory.js';
+import { meshPoolManager } from '../rendering/MeshPoolManager.js';
 
 /**
  * LaserHazardSystem
@@ -45,8 +47,11 @@ export class LaserHazardSystem {
     this._beamGroup.name = 'ActiveLaserBeamGroup';
     this._beamRadius = 0.0036;
 
-    const beamGeo = new THREE.CylinderGeometry(1, 1, 1, 16, 1, true);
-    beamGeo.rotateX(Math.PI / 2); // Align with Z-axis
+    const beamGeo = bufferGeometryFactory.getOrCreate('laser_beam_cylinder', () => {
+      const g = new THREE.CylinderGeometry(1, 1, 1, 16, 1, true);
+      g.rotateX(Math.PI / 2); // Align with Z-axis
+      return g;
+    });
 
     // White-hot inner core - ultra-concentrated razor-sharp line
     this._coreMaterial = new THREE.MeshBasicMaterial({
@@ -77,6 +82,22 @@ export class LaserHazardSystem {
       depthWrite: false
     });
     this._guideMesh = new THREE.Mesh(beamGeo, this._guideMaterial);
+
+    // Shared materials for floating emitter blocks
+    this._emitterMat = new THREE.MeshStandardMaterial({
+      color: 0xff0033,
+      emissive: new THREE.Color(0xff0033),
+      emissiveIntensity: 1.2,
+      roughness: 0.15,
+      metalness: 0.35
+    });
+
+    this._ringMat = new THREE.MeshBasicMaterial({
+      color: 0xff0044,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending
+    });
 
     this._beamGroup.add(this._coreMesh);
     this._beamGroup.add(this._glowMesh);
@@ -133,56 +154,50 @@ export class LaserHazardSystem {
   }
 
   /**
-   * Constructs a hovering red laser emitter sphere ("kulka czerwona unosząca się nad kafelkiem bez bazy").
+   * Constructs or retrieves a pooled hovering red laser emitter sphere ("kulka czerwona unosząca się nad kafelkiem bez bazy").
    * Free-floating in the air with no base, continuously visible and levitating above the tile.
    */
   _createRedLaserBlock() {
-    const block = new THREE.Group();
-    block.name = 'RedLaserBlock';
+    const block = meshPoolManager.acquire('laser_block', () => {
+      const b = new THREE.Group();
+      b.name = 'RedLaserBlock';
 
-    // 1. Glowing red floating sphere emitter ("kulka czerwona unosząca się nad kafelkiem")
-    const sphereGeo = new THREE.SphereGeometry(0.009, 24, 24);
-    const emitterMat = new THREE.MeshStandardMaterial({
-      color: 0xff0033,
-      emissive: new THREE.Color(0xff0033),
-      emissiveIntensity: 1.2,
-      roughness: 0.15,
-      metalness: 0.35
+      // 1. Glowing red floating sphere emitter with shared geometry & material
+      const sphereGeo = bufferGeometryFactory.createSphere(0.009, 24, 24);
+      const sphereMesh = new THREE.Mesh(sphereGeo, this._emitterMat);
+      sphereMesh.position.y = 0.024;
+      sphereMesh.name = 'BlockEmitter';
+      sphereMesh.castShadow = true;
+      b.add(sphereMesh);
+
+      // 2. Subtle floating equatorial energy ring with shared geometry & material
+      const ringGeo = bufferGeometryFactory.createTorus(0.0125, 0.0009, 8, 24);
+      const ringMesh = new THREE.Mesh(ringGeo, this._ringMat);
+      ringMesh.rotation.x = Math.PI / 2;
+      ringMesh.position.y = 0.024;
+      ringMesh.name = 'BlockRing';
+      b.add(ringMesh);
+
+      // 3. Point light hovering with the sphere and casting dynamic red glow on the tile below
+      const light = new THREE.PointLight(0xff0033, 0.45, 0.32);
+      light.position.y = 0.024;
+      light.name = 'BlockLight';
+      b.add(light);
+
+      b.userData = {
+        baseY: 0.024,
+        phaseOffset: Math.random() * Math.PI * 2
+      };
+
+      return b;
     });
-    const sphereMesh = new THREE.Mesh(sphereGeo, emitterMat);
-    sphereMesh.position.y = 0.024;
-    sphereMesh.name = 'BlockEmitter';
-    sphereMesh.castShadow = true;
-    block.add(sphereMesh);
 
-    // 2. Subtle floating equatorial energy ring around the sphere
-    const ringGeo = new THREE.TorusGeometry(0.0125, 0.0009, 8, 24);
-    ringGeo.rotateX(Math.PI / 2);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: 0xff0044,
-      transparent: true,
-      opacity: 0.85,
-      blending: THREE.AdditiveBlending
-    });
-    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-    ringMesh.position.y = 0.024;
-    ringMesh.name = 'BlockRing';
-    block.add(ringMesh);
-
-    // 3. Point light hovering with the sphere and casting dynamic red glow on the tile below
-    const light = new THREE.PointLight(0xff0033, 0.45, 0.32);
-    light.position.y = 0.024;
-    light.name = 'BlockLight';
-    block.add(light);
-
-    // Metadata for organic levitation / hovering physics
-    block.userData = {
-      baseY: 0.024,
-      phaseOffset: Math.random() * Math.PI * 2
-    };
-
-    // Always visible
-    block.visible = true;
+    if (block) {
+      block.visible = true;
+      if (!block.userData) {
+        block.userData = { baseY: 0.024, phaseOffset: Math.random() * Math.PI * 2 };
+      }
+    }
     return block;
   }
 
@@ -205,10 +220,16 @@ export class LaserHazardSystem {
   }
 
   _findAndCreateCorridors() {
-    // Clear any previous blocks
+    // Clear and recycle any previous blocks
     for (const corr of this._corridors) {
-      if (corr.blockA && corr.blockA.parent) corr.blockA.parent.remove(corr.blockA);
-      if (corr.blockB && corr.blockB.parent) corr.blockB.parent.remove(corr.blockB);
+      if (corr.blockA) {
+        if (corr.blockA.parent) corr.blockA.parent.remove(corr.blockA);
+        meshPoolManager.release('laser_block', corr.blockA);
+      }
+      if (corr.blockB) {
+        if (corr.blockB.parent) corr.blockB.parent.remove(corr.blockB);
+        meshPoolManager.release('laser_block', corr.blockB);
+      }
     }
     this._corridors = [];
 
@@ -707,8 +728,14 @@ export class LaserHazardSystem {
   dispose() {
     this.reset();
     for (const corr of this._corridors) {
-      if (corr.blockA && corr.blockA.parent) corr.blockA.parent.remove(corr.blockA);
-      if (corr.blockB && corr.blockB.parent) corr.blockB.parent.remove(corr.blockB);
+      if (corr.blockA) {
+        if (corr.blockA.parent) corr.blockA.parent.remove(corr.blockA);
+        meshPoolManager.release('laser_block', corr.blockA);
+      }
+      if (corr.blockB) {
+        if (corr.blockB.parent) corr.blockB.parent.remove(corr.blockB);
+        meshPoolManager.release('laser_block', corr.blockB);
+      }
     }
     this._corridors = [];
     if (this.group.parent) {

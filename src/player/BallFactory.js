@@ -4,6 +4,7 @@ import { createBallMaterial, BALL_COLORS } from '../materials/ballMaterials.js';
 import { createBrassGhostMaterial } from '../materials/brassGhostMaterial.js';
 import { createMarbleGhostMaterial } from '../materials/marbleGhostMaterial.js';
 import { createWoodGhostMaterial } from '../materials/woodGhostMaterial.js';
+import { createChromeGhostMaterial } from '../materials/chromeGhostMaterial.js';
 
 export class BallFactory {
     constructor() {
@@ -36,6 +37,9 @@ export class BallFactory {
                     break;
                 case 'wood':
                     material = createWoodGhostMaterial();
+                    break;
+                case 'chrome':
+                    material = createChromeGhostMaterial();
                     break;
                 default:
                     material = createBrassGhostMaterial();

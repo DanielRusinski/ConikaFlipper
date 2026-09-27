@@ -1,7 +1,7 @@
 import { eventBus } from '../core/EventBus.js';
 import { inputManager } from '../core/InputManager.js';
 import { GAME_CONFIG } from '../config/gameConfig.js';
-import { BALL_COLORS, BALL_CSS_COLORS } from '../materials/ballMaterials.js';
+import { BALL_COLORS, BALL_CSS_COLORS, BALL_DISPLAY_NAMES } from '../materials/ballMaterials.js';
 import { ScoreDisplay } from './ScoreDisplay.js';
 import anime from 'animejs';
 
@@ -257,8 +257,17 @@ export class GameHUD {
   _updateBallIndicator(type) {
     const key = (type || 'brass').toLowerCase();
     const color = BALL_CSS_COLORS ? BALL_CSS_COLORS[key] : '#d4a84b';
-    this._ballIndicatorEl.style.background = `radial-gradient(circle at 35% 35%, #ffffff 0%, ${color} 50%, rgba(0,0,0,0.7) 100%)`;
-    this._ballIndicatorEl.title = `Current ball: ${key} (Click to change)`;
+    if (key === 'chrome') {
+      this._ballIndicatorEl.style.background = `linear-gradient(180deg, #f8fafc 0%, #cbd5e1 35%, #181926 37%, #bf00ff 43%, #ff88ff 50%, #bf00ff 57%, #181926 63%, #cbd5e1 65%, #64748b 100%)`;
+      this._ballIndicatorEl.style.boxShadow = '0 0 12px rgba(191, 0, 255, 0.85), inset 0 0 4px rgba(255, 255, 255, 0.5)';
+      this._ballIndicatorEl.style.borderColor = '#bf00ff';
+    } else {
+      this._ballIndicatorEl.style.background = `radial-gradient(circle at 35% 35%, #ffffff 0%, ${color} 50%, rgba(0,0,0,0.7) 100%)`;
+      this._ballIndicatorEl.style.boxShadow = '';
+      this._ballIndicatorEl.style.borderColor = 'rgba(255,255,255,0.3)';
+    }
+    const displayName = (typeof BALL_DISPLAY_NAMES !== 'undefined' && BALL_DISPLAY_NAMES[key]) ? BALL_DISPLAY_NAMES[key] : key;
+    this._ballIndicatorEl.title = `Current ball: ${displayName} (Click to change)`;
   }
 
   _updateModifier(card) {

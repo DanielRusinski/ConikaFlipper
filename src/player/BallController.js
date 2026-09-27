@@ -14,6 +14,8 @@ export class BallController {
         this._factory = new BallFactory();
         this._accumulator = 0;
         this._posObj = new THREE.Vector3();
+        this._rotAxis = new THREE.Vector3();
+        this._deltaQuat = new THREE.Quaternion();
         this.active = false;
     }
 
@@ -59,6 +61,26 @@ export class BallController {
             GAME_CONFIG.ball.radius,
             pos.y - GAME_CONFIG.table.height / 2
         );
+
+        // 3D physical rolling rotation based on table velocity
+        const vx = this._collisionSystem.vx || 0;
+        const vy = this._collisionSystem.vy || 0;
+        const speedSq = vx * vx + vy * vy;
+        if (speedSq > 0.000001) {
+            const speed = Math.sqrt(speedSq);
+            const radius = GAME_CONFIG.ball.radius || 0.0135;
+            const angle = (speed * effectiveDt) / radius;
+            // Axis of rotation for pure rolling without slipping:
+            // v_point = omega x r => top of ball (+Y) moves forward in direction of (vx, 0, vy)
+            // omega_x = +vy / R, omega_z = -vx / R
+            this._rotAxis.set(vy / speed, 0, -vx / speed);
+            this._deltaQuat.setFromAxisAngle(this._rotAxis, angle);
+            this.mesh.quaternion.premultiply(this._deltaQuat);
+            if (this.ghostMesh) {
+                this.ghostMesh.quaternion.copy(this.mesh.quaternion);
+            }
+        }
+
         if (this.ghostMesh) {
             this.ghostMesh.position.copy(this.mesh.position);
             this.ghostMesh.visible = this._ghostEnabled && this.mesh.visible;
@@ -80,9 +102,11 @@ export class BallController {
             this.mesh.receiveShadow = true;
             this.ghostMesh = this._factory.createGhostBall(this.type);
             
+            this.mesh.quaternion.setFromEuler(new THREE.Euler(0.35, 0.45, 0));
             this.mesh.position.copy(pos);
             if (this.ghostMesh) {
                 this.ghostMesh.position.copy(pos);
+                this.ghostMesh.quaternion.copy(this.mesh.quaternion);
                 this.ghostMesh.visible = this._ghostEnabled && this.mesh.visible;
                 this._boardGroup.add(this.ghostMesh);
             }
@@ -144,11 +168,13 @@ export class BallController {
         const physY = z + GAME_CONFIG.table.height / 2;
         
         this._collisionSystem.reset(physX, physY);
+        this.mesh.quaternion.setFromEuler(new THREE.Euler(0.35, 0.45, 0));
         this.mesh.position.set(x, GAME_CONFIG.ball.radius, z);
         this.mesh.visible = true;
         this.active = true;
         if (this.ghostMesh) {
             this.ghostMesh.position.copy(this.mesh.position);
+            this.ghostMesh.quaternion.copy(this.mesh.quaternion);
             this.ghostMesh.visible = this._ghostEnabled && this.mesh.visible;
         }
         this._accumulator = 0;

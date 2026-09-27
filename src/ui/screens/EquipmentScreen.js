@@ -1,4 +1,5 @@
 import { eventBus } from '../../core/EventBus.js';
+import { GAME_CONFIG } from '../../config/gameConfig.js';
 import { BALL_COLORS, BALL_CSS_COLORS, BALL_DISPLAY_NAMES } from '../../materials/ballMaterials.js';
 import anime from 'animejs';
 
@@ -33,7 +34,7 @@ export class EquipmentScreen {
     `;
     
     const grid = this._el.querySelector('.equipment-grid');
-    const types = ['brass', 'marble', 'wood'];
+    const types = GAME_CONFIG.ball?.types || ['brass', 'marble', 'wood', 'chrome'];
     
     types.forEach(type => {
       const opt = document.createElement('div');
@@ -49,8 +50,14 @@ export class EquipmentScreen {
       opt.style.transition = 'border-color 0.2s, background 0.2s, transform 0.15s';
       
       const cssColor = BALL_CSS_COLORS[type] || '#ccc';
+      let previewBg = `radial-gradient(circle at 35% 35%, #ffffff 0%, ${cssColor} 45%, rgba(0,0,0,0.7) 100%)`;
+      let previewGlow = '0 6px 16px rgba(0,0,0,0.5), inset 0 -4px 6px rgba(0,0,0,0.4)';
+      if (type === 'chrome') {
+        previewBg = `linear-gradient(180deg, #f8fafc 0%, #cbd5e1 35%, #181926 37%, #bf00ff 43%, #ff88ff 50%, #bf00ff 57%, #181926 63%, #cbd5e1 65%, #64748b 100%)`;
+        previewGlow = '0 0 16px rgba(191, 0, 255, 0.75), 0 6px 16px rgba(0,0,0,0.5), inset 0 -4px 6px rgba(0,0,0,0.4)';
+      }
       opt.innerHTML = `
-        <div style="width:64px; height:64px; border-radius:50%; margin:0 auto 14px; background:radial-gradient(circle at 35% 35%, #ffffff 0%, ${cssColor} 45%, rgba(0,0,0,0.7) 100%); box-shadow:0 6px 16px rgba(0,0,0,0.5), inset 0 -4px 6px rgba(0,0,0,0.4);"></div>
+        <div style="width:64px; height:64px; border-radius:50%; margin:0 auto 14px; background:${previewBg}; box-shadow:${previewGlow};"></div>
         <div style="font-size:16px; font-weight:700; letter-spacing:0.5px;">${BALL_DISPLAY_NAMES[type] || type}</div>
       `;
       

@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import { LIGHTING_CONFIG } from '../config/lightingConfig.js';
 import { eventBus } from '../core/EventBus.js';
+import { setJellyEnvironmentMap } from '../materials/jellyMaterials.js';
+import { setTileEnvironmentMap } from '../materials/tileMaterials.js';
 
 export class LightingSystem {
     constructor() {
@@ -61,6 +63,8 @@ export class LightingSystem {
             texture.mapping = THREE.EquirectangularReflectionMapping;
             this.scene.environment = texture;
             this.environmentTexture = texture;
+            setJellyEnvironmentMap(texture);
+            setTileEnvironmentMap(texture);
         }, undefined, (error) => {
             console.warn('EXR ambient lighting load failed:', error);
         });

@@ -98,37 +98,105 @@ export class CollisionSystem {
         const tanDamp = Math.max(0, 1.0 - GAME_CONFIG.physics.wallFriction * subDt * 2.5);
         const bounceThreshold = 0.12;
         
-        // 1. Table Borders / Cushions (left, right, top, bottom)
-        // Left wall
-        if (this.px - r < 0) {
-            this.px = r;
-            if (this.vx < 0) {
-                this.vx = (this.vx < -bounceThreshold) ? -this.vx * rest : 0;
-            }
-            this.vy *= tanDamp;
-        } else if (this.px + r > this._tableWidth) {
-            // Right wall
-            this.px = this._tableWidth - r;
-            if (this.vx > 0) {
-                this.vx = (this.vx > bounceThreshold) ? -this.vx * rest : 0;
-            }
-            this.vy *= tanDamp;
+        // 1. Table Borders & Rounded Corners
+        const cr = 0.020; // Corner radius matching BorderWall fillet
+        const w = this._tableWidth;
+        const h = this._tableHeight;
+
+        // Check if ball is in one of the 4 rounded corner quadrants
+        let inCorner = false;
+        let cx = 0;
+        let cy = 0;
+
+        if (this.px < cr && this.py < cr) {
+            // Top-Left corner
+            inCorner = true;
+            cx = cr;
+            cy = cr;
+        } else if (this.px > w - cr && this.py < cr) {
+            // Top-Right corner
+            inCorner = true;
+            cx = w - cr;
+            cy = cr;
+        } else if (this.px < cr && this.py > h - cr) {
+            // Bottom-Left corner
+            inCorner = true;
+            cx = cr;
+            cy = h - cr;
+        } else if (this.px > w - cr && this.py > h - cr) {
+            // Bottom-Right corner
+            inCorner = true;
+            cx = w - cr;
+            cy = h - cr;
         }
-        
-        // Top wall
-        if (this.py - r < 0) {
-            this.py = r;
-            if (this.vy < 0) {
-                this.vy = (this.vy < -bounceThreshold) ? -this.vy * rest : 0;
+
+        if (inCorner) {
+            const dx = this.px - cx;
+            const dy = this.py - cy;
+            const dist = Math.hypot(dx, dy);
+            const maxAllowedDist = cr - r;
+
+            // If ball penetrates beyond the corner arc
+            if (dist > maxAllowedDist && dist > 1e-6) {
+                const nx = dx / dist;
+                const ny = dy / dist;
+
+                // Push ball back onto the circular arc
+                this.px = cx + nx * maxAllowedDist;
+                this.py = cy + ny * maxAllowedDist;
+
+                // Normal vector pointing inward from the wall arc
+                const inwardNx = -nx;
+                const inwardNy = -ny;
+
+                // Relative velocity along collision normal
+                const vn = this.vx * inwardNx + this.vy * inwardNy;
+                if (vn < 0) {
+                    const impulse = (Math.abs(vn) > bounceThreshold) ? -(1 + rest) * vn : -vn;
+                    this.vx += inwardNx * impulse;
+                    this.vy += inwardNy * impulse;
+                }
+
+                // Tangential friction
+                const tx = -inwardNy;
+                const ty = inwardNx;
+                const vt = this.vx * tx + this.vy * ty;
+                this.vx = inwardNx * (this.vx * inwardNx + this.vy * inwardNy) + tx * vt * tanDamp;
+                this.vy = inwardNy * (this.vx * inwardNx + this.vy * inwardNy) + ty * vt * tanDamp;
             }
-            this.vx *= tanDamp;
-        } else if (this.py + r > this._tableHeight) {
-            // Bottom wall
-            this.py = this._tableHeight - r;
-            if (this.vy > 0) {
-                this.vy = (this.vy > bounceThreshold) ? -this.vy * rest : 0;
+        } else {
+            // Straight walls
+            // Left wall
+            if (this.px - r < 0) {
+                this.px = r;
+                if (this.vx < 0) {
+                    this.vx = (this.vx < -bounceThreshold) ? -this.vx * rest : 0;
+                }
+                this.vy *= tanDamp;
+            } else if (this.px + r > w) {
+                // Right wall
+                this.px = w - r;
+                if (this.vx > 0) {
+                    this.vx = (this.vx > bounceThreshold) ? -this.vx * rest : 0;
+                }
+                this.vy *= tanDamp;
             }
-            this.vx *= tanDamp;
+            
+            // Top wall
+            if (this.py - r < 0) {
+                this.py = r;
+                if (this.vy < 0) {
+                    this.vy = (this.vy < -bounceThreshold) ? -this.vy * rest : 0;
+                }
+                this.vx *= tanDamp;
+            } else if (this.py + r > h) {
+                // Bottom wall
+                this.py = h - r;
+                if (this.vy > 0) {
+                    this.vy = (this.vy > bounceThreshold) ? -this.vy * rest : 0;
+                }
+                this.vx *= tanDamp;
+            }
         }
         
         // 2. Obstacles / Elevated Columns / Raised Tiles
