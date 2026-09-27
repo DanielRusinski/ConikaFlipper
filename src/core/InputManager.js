@@ -72,6 +72,16 @@ class InputManager {
 
     // Directly bind orientation listeners (works out of the box on Android Chrome)
     this._bindOrientationEvents();
+
+    // Respect bomb targeting mode to prevent board dragging during bomb placement
+    this._isBombTargeting = false;
+    eventBus.on('bomb:targetingChanged', ({ active }) => {
+      this._isBombTargeting = Boolean(active);
+      if (this._isBombTargeting) {
+        this._pointerDown = false;
+        this._activePointerId = null;
+      }
+    });
   }
 
   async requestGyroPermission() {
@@ -221,6 +231,8 @@ class InputManager {
   }
 
   _onPointerDown(e) {
+    if (this._isBombTargeting) return;
+
     // If target is inside UI elements or editable inputs, don't capture for board tilt/drag
     if (this.isEditableTarget(e.target) || (e.target && e.target.closest && (e.target.closest('#hud') || e.target.closest('#screens') || e.target.closest('#battle-menu-overlay') || e.target.closest('#landscape-notice')))) {
       return;

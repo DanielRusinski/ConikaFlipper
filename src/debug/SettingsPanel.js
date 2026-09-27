@@ -149,7 +149,7 @@ export class SettingsPanel {
         spawnCentipedeBtn.on('click', () => eventBus.emit('request:spawnCentipede'));
         
         const ballFolder = this._pane.addFolder({ title: 'Ball / Bila', expanded: true });
-        ballFolder.addBinding(this._params, 'ballType', { options: { brass: 'brass', marble: 'marble', wood: 'wood' }});
+        ballFolder.addBinding(this._params, 'ballType', { options: { brass: 'brass', marble: 'marble', wood: 'wood', chrome: 'chrome' }});
         ballFolder.addBinding(this._params, 'ghostSilhouette');
         ballFolder.addBinding(this._params, 'ballSpeedMultiplier', {
             label: 'Ball Speed / Prędkość Bili',

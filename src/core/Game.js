@@ -16,6 +16,7 @@ import { colourManagement } from '../rendering/ColourManagement.js';
 import { shaderManager } from '../rendering/ShaderManager.js';
 
 import { TileManager } from '../world/TileManager.js';
+import { BorderWall } from '../world/BorderWall.js';
 import { ObstacleManager } from '../world/ObstacleManager.js';
 import { BoardValidator } from '../world/BoardValidator.js';
 import { CollisionSystem } from '../world/CollisionSystem.js';
@@ -45,6 +46,12 @@ import { getStageConfig, STAGE_CONFIG } from '../config/stageConfig.js';
 import { SettingsPanel } from '../debug/SettingsPanel.js';
 import { DebugPanel } from '../debug/DebugPanel.js';
 import { PerformanceGraph } from '../debug/PerformanceGraph.js';
+import { performanceMonitor } from '../rendering/PerformanceMonitor.js';
+import { bufferGeometryFactory } from '../rendering/BufferGeometryFactory.js';
+import { glbGeometryCache } from '../rendering/GLBGeometryCache.js';
+import { geometryBatchManager } from '../rendering/GeometryBatchManager.js';
+import { meshPoolManager } from '../rendering/MeshPoolManager.js';
+import { lodManager } from '../rendering/LODManager.js';
 
 import { TransitionManager } from '../effects/TransitionManager.js';
 import { PickupAnimations } from '../effects/PickupAnimations.js';
@@ -157,10 +164,14 @@ export class Game {
         this.tileManager.init(this.scene, new THREE.TextureLoader());
         this.boardGroup.add(this.tileManager.group);
 
+        // 7b. Perimeter Border Wall (surrounds the entire board with rounded corners, height half of columns)
+        this.borderWall = new BorderWall();
+        this.borderWall.init(this.boardGroup, this.lightingSystem ? this.lightingSystem.environmentTexture : null);
+
         // 8. Obstacles
         this.boardValidator = new BoardValidator();
         this.obstacleManager = new ObstacleManager();
-        this.obstacleManager.init(this.tileManager);
+        this.obstacleManager.init(this.tileManager, this.lightingSystem);
 
         const spawnGX = GAME_CONFIG.spawn.defaultGridX;
         const spawnGY = GAME_CONFIG.spawn.defaultGridY;
@@ -280,6 +291,10 @@ export class Game {
 
         this.performanceGraph = new PerformanceGraph();
         this.performanceGraph.init();
+
+        // 16b. Production performance telemetry & diagnostics monitor
+        performanceMonitor.init();
+        lodManager.setQualityTier(qualityManager.level || 'high', GRAPHICS_CONFIG.isMobile);
 
         // 17. Effects
         this.transitionManager = new TransitionManager();
@@ -444,13 +459,12 @@ export class Game {
         });
         eventBus.on('coin:collected', () => playSound(1100, 0.12));
         eventBus.on('finding:collected', (data) => {
-            playSound(850, 0.2);
             if (data && data.givesLife && this.ballLifeSystem) {
                 this.ballLifeSystem.addLife(1);
             }
         });
         eventBus.on('laser:hit', (data) => this._onLaserHit(data));
-        eventBus.on('modifier:collected', () => playSound(1300, 0.3));
+        eventBus.on('modifier:collected', () => {});
         eventBus.on('modifier:selected', ({ card }) => {
             if (card && card.duration && card.duration > 0) {
                 const addedSeconds = Number(card.duration);
@@ -777,6 +791,16 @@ export class Game {
                 }
             }
 
+            // Tile manager update (flash bloom fade and glowing tile highlights)
+            if (this.tileManager && this.tileManager.update) {
+                this.tileManager.update(gameplayDelta);
+            }
+
+            // Obstacle manager update (jelly wobble and spring physics when tilting)
+            if (this.obstacleManager && this.obstacleManager.update) {
+                this.obstacleManager.update(delta, this._currentTiltX, this._currentTiltY);
+            }
+
             // Score multiplier expiry (only ticks down during active play)
             if (isPlaying) {
                 this.scoreSystem.update(elapsed);
@@ -979,6 +1003,10 @@ export class Game {
                 cellParticles.update(delta, this.camera);
             }
 
+            if (this.obstacleManager && this.obstacleManager.update) {
+                this.obstacleManager.update(delta, 0, 0);
+            }
+
             // Respawn countdown handling (9 to 0) & auto-launch
             if (this._respawnCountdown !== null) {
                 this._respawnCountdown -= delta;
@@ -1025,7 +1053,7 @@ export class Game {
 
         // UI updates (real time)
         this.gameHUD.update(delta);
-        this.coinRewardSystem.update(this.camera, this.renderer);
+        this.coinRewardSystem.update(this.camera, this.renderer, delta);
 
         // Debug
         this.debugPanel.update({
@@ -1066,6 +1094,15 @@ export class Game {
 
         // Label renderer (CSS2D - separate pass)
         this.labelSystem.update(this.scene, this.camera);
+
+        // Update LOD manager camera state
+        lodManager.updateCamera(this.camera);
+
+        // Commit all dynamic geometry batches
+        geometryBatchManager.commitAll();
+
+        // Update performance telemetry monitor
+        performanceMonitor.update(delta, this.renderer, this.scene);
 
         performanceManager.end();
         this.performanceGraph.end();
@@ -1478,7 +1515,7 @@ export class Game {
         this.boardGroup.add(this.tileManager.group);
 
         this.obstacleManager = new ObstacleManager();
-        this.obstacleManager.init(this.tileManager);
+        this.obstacleManager.init(this.tileManager, this.lightingSystem);
         const seed = (params && params.randomSeed) ? params.randomSeed : (Date.now() % 100000);
         const obstacles = this.obstacleManager.generate(
             GAME_CONFIG.grid.tilesX,
@@ -1585,6 +1622,7 @@ export class Game {
         if (this.enemySystem) this.enemySystem.dispose();
         if (this.centipedeSystem) this.centipedeSystem.dispose();
         this.obstacleManager.dispose();
+        if (this.borderWall) this.borderWall.dispose();
         this.tileManager.dispose();
 
         this.postProcessing.dispose();
@@ -1592,6 +1630,14 @@ export class Game {
         this.lightingSystem.dispose();
         this.rendererManager.dispose();
         if (this.stageBriefing) this.stageBriefing.dispose();
+
+        // Dispose performance & cache architecture
+        performanceMonitor.dispose();
+        meshPoolManager.disposeAll();
+        geometryBatchManager.disposeAll();
+        glbGeometryCache.disposeAll();
+        bufferGeometryFactory.disposeAll();
+
         eventBus.clear();
     }
 }

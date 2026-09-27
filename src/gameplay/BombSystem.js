@@ -4,6 +4,8 @@ import { eventBus } from '../core/EventBus.js';
 import { playSound } from '../soundfx.js';
 import { cellParticles } from '../fx_cells.js';
 import { CircularLoadingRingManager } from '../rendering/CircularLoadingRing.js';
+import { bufferGeometryFactory } from '../rendering/BufferGeometryFactory.js';
+import { meshPoolManager } from '../rendering/MeshPoolManager.js';
 
 export class BombSystem {
     constructor() {
@@ -41,10 +43,13 @@ export class BombSystem {
         // Active bombs in world
         this._activeBombs = [];
 
-        // Geometries and materials cache
-        this._bombGeo = new THREE.SphereGeometry(this._tileWidth * 0.46, 24, 24);
-        this._bombCapGeo = new THREE.CylinderGeometry(this._tileWidth * 0.12, this._tileWidth * 0.16, 0.007, 16);
-        this._bombCapGeo.translate(0, this._tileWidth * 0.46, 0);
+        // Shared geometries and materials via BufferGeometryFactory
+        this._bombGeo = bufferGeometryFactory.createSphere(this._tileWidth * 0.46, 24, 24);
+        this._bombCapGeo = bufferGeometryFactory.getOrCreate(`bomb_cap_${(this._tileWidth * 0.12).toFixed(5)}`, () => {
+            const g = new THREE.CylinderGeometry(this._tileWidth * 0.12, this._tileWidth * 0.16, 0.007, 16);
+            g.translate(0, this._tileWidth * 0.46, 0);
+            return g;
+        });
 
         this._bombMat = new THREE.MeshStandardMaterial({
             color: 0x181822,
@@ -60,10 +65,8 @@ export class BombSystem {
             roughness: 0.2
         });
 
-        // Flash expansion geometry for blast wave: perfectly circular thin ring lying flat on table (horizontal in XZ plane)
-        // Thin ring from 0.975 to 1.0 (128 segments for smooth circular curvature)
-        this._blastGeo = new THREE.RingGeometry(0.975, 1.0, 128);
-        this._blastGeo.rotateX(-Math.PI / 2); // Rotate to lie flat in XZ plane parallel to table
+        // Flash expansion geometry for blast wave: perfectly circular thin ring in XZ plane
+        this._blastGeo = bufferGeometryFactory.createRingXZ(0.975, 1.0, 128);
         this._blastMat = new THREE.MeshBasicMaterial({
             color: 0xff7700,
             transparent: true,
@@ -159,6 +162,10 @@ export class BombSystem {
         return this._bombCount;
     }
 
+    isTargetingActive() {
+        return this._targetingActive;
+    }
+
     toggleTargeting() {
         if (this._bombCount <= 0) return;
         this.setTargeting(!this._targetingActive);
@@ -170,20 +177,17 @@ export class BombSystem {
 
         if (this._reticleMesh) {
             this._reticleMesh.visible = active;
+            if (!active) this._lastReticleGrid = null;
         }
 
         if (active) {
-            if (this._domElement) {
-                this._domElement.addEventListener('pointermove', this._onPointerMove, { passive: true });
-                this._domElement.addEventListener('pointerdown', this._onPointerDown);
-            }
+            window.addEventListener('pointermove', this._onPointerMove, { passive: true });
+            window.addEventListener('pointerdown', this._onPointerDown, { capture: true });
             window.addEventListener('keydown', this._onKeyDown);
             playSound(700, 0.15);
         } else {
-            if (this._domElement) {
-                this._domElement.removeEventListener('pointermove', this._onPointerMove);
-                this._domElement.removeEventListener('pointerdown', this._onPointerDown);
-            }
+            window.removeEventListener('pointermove', this._onPointerMove);
+            window.removeEventListener('pointerdown', this._onPointerDown, { capture: true });
             window.removeEventListener('keydown', this._onKeyDown);
         }
 
@@ -196,69 +200,116 @@ export class BombSystem {
         }
     }
 
-    _onPointerMove(e) {
-        if (!this._targetingActive || !this._camera || !this._domElement) return;
+    _getGridTileFromPointer(e) {
+        if (!this._camera || !this._parentGroup || !this._domElement) return null;
 
         const rect = this._domElement.getBoundingClientRect();
         this._mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         this._mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
         this._raycaster.setFromCamera(this._mouse, this._camera);
-        if (this._raycaster.ray.intersectPlane(this._plane, this._planeIntersect)) {
-            const gx = Math.floor((this._planeIntersect.x + this._tableWidth / 2) / this._tileWidth);
-            const gy = Math.floor((this._planeIntersect.z + this._tableHeight / 2) / this._tileHeight);
+
+        // Transform ray from camera into boardGroup local coordinate space
+        this._parentGroup.updateMatrixWorld(true);
+        const invMatrix = new THREE.Matrix4().copy(this._parentGroup.matrixWorld).invert();
+        const localRay = this._raycaster.ray.clone().applyMatrix4(invMatrix);
+
+        // Local table plane: normal is (0, 1, 0), constant is 0 (table top is at local Y=0)
+        const localPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+        const localIntersect = new THREE.Vector3();
+
+        if (localRay.intersectPlane(localPlane, localIntersect)) {
+            const gx = Math.floor((localIntersect.x + this._tableWidth / 2) / this._tileWidth);
+            const gy = Math.floor((localIntersect.z + this._tableHeight / 2) / this._tileHeight);
 
             if (gx >= 0 && gx < this._tilesX && gy >= 0 && gy < this._tilesY) {
-                const isObs = this._tileManager ? this._tileManager.isObstacle(gx, gy) : false;
-                const wx = (gx + 0.5) * this._tileWidth - this._tableWidth / 2;
-                const wz = (gy + 0.5) * this._tileHeight - this._tableHeight / 2;
+                return { gx, gy, localIntersect };
+            }
+        }
+        return null;
+    }
 
-                this._reticleMesh.position.set(wx, 0.004, wz);
-                this._reticleMesh.visible = true;
+    _onPointerMove(e) {
+        if (!this._targetingActive) return;
 
-                if (isObs) {
-                    this._reticleMesh.material.color.setHex(0x555555);
-                    this._reticleMesh.material.opacity = 0.35;
-                } else {
-                    this._reticleMesh.material.color.setHex(0xff3b30);
-                    this._reticleMesh.material.opacity = 0.9;
-                }
+        const tile = this._getGridTileFromPointer(e);
+        if (tile) {
+            const { gx, gy } = tile;
+            const isObs = this._tileManager ? this._tileManager.isObstacle(gx, gy) : false;
+            const wx = (gx + 0.5) * this._tileWidth - this._tableWidth / 2;
+            const wz = (gy + 0.5) * this._tileHeight - this._tableHeight / 2;
 
-                if (!this._lastReticleGrid || this._lastReticleGrid.gx !== gx || this._lastReticleGrid.gy !== gy) {
-                    this._lastReticleGrid = { gx, gy };
-                    if (!isObs) playSound(600, 0.03);
-                }
+            this._reticleMesh.position.set(wx, 0.005, wz);
+            this._reticleMesh.visible = true;
+
+            if (isObs) {
+                this._reticleMesh.material.color.setHex(0x555555);
+                this._reticleMesh.material.opacity = 0.35;
+            } else {
+                this._reticleMesh.material.color.setHex(0xff3b30);
+                this._reticleMesh.material.opacity = 0.9;
+            }
+
+            if (!this._lastReticleGrid || this._lastReticleGrid.gx !== gx || this._lastReticleGrid.gy !== gy) {
+                this._lastReticleGrid = { gx, gy };
+                if (!isObs) playSound(600, 0.03);
             }
         }
     }
 
     _onPointerDown(e) {
         if (!this._targetingActive || this._bombCount <= 0) return;
-        // Ignore clicks on HUD buttons
-        if (e.target && e.target.closest && (e.target.closest('#hud') || e.target.closest('#screens') || e.target.closest('#panels'))) return;
+        // Ignore clicks on HUD buttons or active overlays
+        if (e.target && e.target.closest && (
+            e.target.closest('#hud') ||
+            e.target.closest('#screens') ||
+            e.target.closest('#panels') ||
+            e.target.closest('.modifier-cards-overlay') ||
+            e.target.closest('.battle-menu-panel')
+        )) {
+            return;
+        }
 
         this.pointerType = e.pointerType; // 'mouse' | 'touch' | 'pen'
 
-        const rect = this._domElement.getBoundingClientRect();
-        this._mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        this._mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        const tile = this._getGridTileFromPointer(e);
+        if (tile) {
+            const { gx, gy } = tile;
 
-        this._raycaster.setFromCamera(this._mouse, this._camera);
-        if (this._raycaster.ray.intersectPlane(this._plane, this._planeIntersect)) {
-            const gx = Math.floor((this._planeIntersect.x + this._tableWidth / 2) / this._tileWidth);
-            const gy = Math.floor((this._planeIntersect.z + this._tableHeight / 2) / this._tileHeight);
-
-            if (gx >= 0 && gx < this._tilesX && gy >= 0 && gy < this._tilesY) {
-                // Must be playable tile (not obstacle)
-                if (this._tileManager && this._tileManager.isObstacle(gx, gy)) {
-                    playSound(180, 0.25); // Error sound
-                    return;
-                }
-
-                // Valid drop!
-                this.deployBomb(gx, gy);
+            // Must be playable tile (not obstacle)
+            if (this._tileManager && this._tileManager.isObstacle(gx, gy)) {
+                playSound(180, 0.25); // Error sound
+                return;
             }
+
+            // Valid drop! Stop propagation so InputManager doesn't drag the board
+            if (e.cancelable) e.preventDefault();
+            if (typeof e.stopPropagation === 'function') e.stopPropagation();
+
+            this.deployBomb(gx, gy);
         }
+    }
+
+    _createBombComposite() {
+        const bombGroup = new THREE.Group();
+        bombGroup.name = 'PooledBomb';
+
+        const sphere = new THREE.Mesh(this._bombGeo, this._bombMat.clone());
+        sphere.castShadow = true;
+        const cap = new THREE.Mesh(this._bombCapGeo, this._bombCapMat);
+        bombGroup.add(sphere);
+        bombGroup.add(cap);
+
+        const ringMesh = this._ringManager.createRingMesh(0xff3b30);
+        ringMesh.position.set(0, 0.003, 0);
+        bombGroup.add(ringMesh);
+
+        bombGroup.userData = {
+            sphereMesh: sphere,
+            capMesh: cap,
+            ringMesh: ringMesh
+        };
+        return bombGroup;
     }
 
     deployBomb(gridX, gridY) {
@@ -272,20 +323,17 @@ export class BombSystem {
         const targetZ = (gridY + 0.5) * this._tileHeight - this._tableHeight / 2;
         const targetY = 0.016; // Sits on table
 
-        // Create 3D bomb composite mesh
-        const bombGroup = new THREE.Group();
+        // Acquire pooled 3D bomb composite mesh
+        let bombGroup = meshPoolManager.acquire('bomb_composite', () => this._createBombComposite());
+        if (!bombGroup) bombGroup = this._createBombComposite();
         bombGroup.name = `Bomb_${gridX}_${gridY}`;
+        bombGroup.visible = true;
 
-        const sphere = new THREE.Mesh(this._bombGeo, this._bombMat.clone());
-        sphere.castShadow = true;
-        const cap = new THREE.Mesh(this._bombCapGeo, this._bombCapMat);
-        bombGroup.add(sphere);
-        bombGroup.add(cap);
-
-        // Circular countdown fuse loading ring (fast 3-second red-orange neon orbit)
-        const ringMesh = this._ringManager.createRingMesh(0xff3b30);
-        ringMesh.position.set(0, 0.003, 0);
-        bombGroup.add(ringMesh);
+        const sphere = bombGroup.userData.sphereMesh;
+        const ringMesh = bombGroup.userData.ringMesh;
+        if (sphere && sphere.material) {
+            sphere.material.emissiveIntensity = 0.25;
+        }
 
         // Drop animation state: falls from arcade sky Y = 0.35 with squash and bounce
         const startY = targetY + 0.38;
@@ -398,7 +446,7 @@ export class BombSystem {
             const t = blast.elapsed / blast.duration;
             if (t >= 1.0) {
                 this._parentGroup.remove(blast.mesh);
-                blast.mesh.material.dispose();
+                meshPoolManager.release('bomb_blast', blast.mesh);
                 this._activeBlasts.splice(j, 1);
             } else {
                 const curRadius = blast.maxRadius * Math.sin(t * Math.PI * 0.5);
@@ -422,11 +470,15 @@ export class BombSystem {
             setTimeout(() => cellParticles.shatter(targetX, targetY + 0.02, targetZ, 32), 40);
         }
 
-        // 3. Expanding shockwave ring mesh (radius ~3 tiles = ~0.085 units)
+        // 3. Expanding shockwave ring mesh from meshPoolManager
         const blastRadius = this._tileWidth * 3.4;
-        const blastMesh = new THREE.Mesh(this._blastGeo, this._blastMat.clone());
+        let blastMesh = meshPoolManager.acquire('bomb_blast', () => {
+            return new THREE.Mesh(this._blastGeo, this._blastMat);
+        });
+        if (!blastMesh) blastMesh = new THREE.Mesh(this._blastGeo, this._blastMat);
         blastMesh.position.set(targetX, 0.005, targetZ);
         blastMesh.scale.set(0.001, 1, 0.001);
+        if (blastMesh.material) blastMesh.material.opacity = 0.95;
         this._parentGroup.add(blastMesh);
         this._activeBlasts.push({
             mesh: blastMesh,
@@ -442,10 +494,9 @@ export class BombSystem {
         eventBus.emit('fx:chromaticAberration', { intensity: 0.055, duration: 0.50, flash: 0.70 });
         eventBus.emit('fx:shake', { trauma: 0.88 });
 
-        // 4. Remove bomb mesh from scene
+        // 4. Return bomb composite to pool
         this._parentGroup.remove(bomb.group);
-        if (bomb.ringMesh && bomb.ringMesh.material) bomb.ringMesh.material.dispose();
-        if (bomb.sphereMesh && bomb.sphereMesh.material) bomb.sphereMesh.material.dispose();
+        meshPoolManager.release('bomb_composite', bomb.group);
 
         // 5. UNCOVER / CONQUER all tiles within explosion blast radius!
         // Bomb explosion assists the player by conquering/revealing tiles in the blast zone
@@ -477,14 +528,13 @@ export class BombSystem {
 
         for (const b of this._activeBombs) {
             this._parentGroup.remove(b.group);
-            if (b.ringMesh && b.ringMesh.material) b.ringMesh.material.dispose();
-            if (b.sphereMesh && b.sphereMesh.material) b.sphereMesh.material.dispose();
+            meshPoolManager.release('bomb_composite', b.group);
         }
         this._activeBombs = [];
 
         for (const blast of this._activeBlasts) {
             this._parentGroup.remove(blast.mesh);
-            blast.mesh.material.dispose();
+            meshPoolManager.release('bomb_blast', blast.mesh);
         }
         this._activeBlasts = [];
     }

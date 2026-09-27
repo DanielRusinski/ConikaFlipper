@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { REWARD_CONFIG } from '../config/rewardConfig.js';
 import { eventBus } from '../core/EventBus.js';
 import { timeManager } from '../core/TimeManager.js';
-import { playSound } from '../soundfx.js';
+import { playSound, playCrystalCollectSound } from '../soundfx.js';
+import { CrystalParticleSystem } from '../effects/CrystalParticleSystem.js';
 
 export class FindingSystem {
   constructor() {
@@ -30,6 +31,7 @@ export class FindingSystem {
     this._octaGeometry = null;
     this._material = null;
     this._ghostMaterial = null;
+    this._crystalParticleSystem = null;
 
     // Pre-allocated colors for instanced rendering
     this._colorCard = new THREE.Color(0xff00cc);    // Neon Magenta
@@ -153,6 +155,11 @@ export class FindingSystem {
 
     this._group.add(this._ghostInstancedMesh);
     this._group.add(this.instancedMesh);
+
+    // Initialize 3D crystal particle effects & shockwaves system
+    this._crystalParticleSystem = new CrystalParticleSystem();
+    this._crystalParticleSystem.init(this._group);
+
     this._findingBoostTimer = null;
     this._unsubs = [
       eventBus.on('tile:discovered', this._onTileDiscovered.bind(this)),
@@ -646,6 +653,10 @@ export class FindingSystem {
     if (this._ghostInstancedMesh) {
       this._ghostInstancedMesh.instanceMatrix.needsUpdate = true;
     }
+
+    if (this._crystalParticleSystem) {
+      this._crystalParticleSystem.update(gameplayDelta);
+    }
   }
 
   checkCollection(ballX, ballZ, ballRadius) {
@@ -671,6 +682,11 @@ export class FindingSystem {
       const collectRadius = ballRadius + crystalRadius;
 
       if (distSq < collectRadius * collectRadius) {
+        const pickupX = slot.baseX;
+        const pickupY = slot.currentY;
+        const pickupZ = slot.baseZ;
+        const pickupColor = slot.color;
+
         slot.active = false;
         slot.state = 'hidden'; // Recycled to hidden so discovery continues throughout entire gameplay
         slot.revealed = false;
@@ -697,6 +713,20 @@ export class FindingSystem {
         const collectedType = slot.type;
         const collectedValue = slot.value;
         const collectedId = slot.id;
+
+        // 1. Trigger 3D crystal particle shatter burst & expanding shockwave
+        if (this._crystalParticleSystem) {
+          this._crystalParticleSystem.spawnCollectBurst(
+            pickupX,
+            pickupY,
+            pickupZ,
+            collectedType,
+            pickupColor
+          );
+        }
+
+        // 2. Play sparkling musical chime
+        playCrystalCollectSound(collectedType);
 
         // Re-roll fresh spec for this recycled slot respecting board limits:
         const currentCards = this._slots.filter(s => s.revealed && s.type === 'modifier').length;
@@ -735,25 +765,31 @@ export class FindingSystem {
           eventBus.emit('finding:collected', {
             id: collectedId,
             value: collectedValue,
-            type: 'points_crystal'
+            type: 'points_crystal',
+            x: pickupX,
+            y: pickupY,
+            z: pickupZ
           });
-          playSound(1250, 0.2);
         } else if (collectedType === 'emerald_crystal') {
           eventBus.emit('finding:collected', {
             id: collectedId,
             value: collectedValue,
             type: 'emerald_crystal',
-            givesLife: true
+            givesLife: true,
+            x: pickupX,
+            y: pickupY,
+            z: pickupZ
           });
-          playSound(1450, 0.25);
         } else {
           // 'modifier' - Pink crystal!
           eventBus.emit('modifier:collected', {
             id: collectedId,
             value: collectedValue,
-            type: 'modifier'
+            type: 'modifier',
+            x: pickupX,
+            y: pickupY,
+            z: pickupZ
           });
-          playSound(1500, 0.3);
         }
 
         const finding = this._findings.get(collectedId);
@@ -894,6 +930,10 @@ export class FindingSystem {
     if (this._ghostInstancedMesh) {
       this._ghostInstancedMesh.instanceMatrix.needsUpdate = true;
     }
+
+    if (this._crystalParticleSystem) {
+      this._crystalParticleSystem.reset();
+    }
   }
 
   dispose() {
@@ -908,6 +948,11 @@ export class FindingSystem {
     if (this._unsub) {
       this._unsub();
       this._unsub = null;
+    }
+
+    if (this._crystalParticleSystem) {
+      this._crystalParticleSystem.dispose();
+      this._crystalParticleSystem = null;
     }
 
     this.reset();

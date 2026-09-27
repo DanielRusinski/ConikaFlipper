@@ -3,6 +3,8 @@ import { GAME_CONFIG } from '../config/gameConfig.js';
 import { eventBus } from '../core/EventBus.js';
 import { playSound } from '../soundfx.js';
 import { cellParticles } from '../fx_cells.js';
+import { bufferGeometryFactory } from '../rendering/BufferGeometryFactory.js';
+import { meshPoolManager } from '../rendering/MeshPoolManager.js';
 
 /**
  * DragonSystem
@@ -45,7 +47,7 @@ export class DragonSystem {
 
         // Spline particle tail trail (instanced points following the dragon path)
         this._trailNodeCount = 44;
-        const trailGeo = new THREE.OctahedronGeometry(0.0042, 0);
+        const trailGeo = bufferGeometryFactory.createOctahedron(0.0042, 0);
         const trailMat = new THREE.MeshBasicMaterial({
             transparent: true,
             opacity: 0.95,
@@ -83,9 +85,8 @@ export class DragonSystem {
         this._trailInstancedMesh.instanceMatrix.needsUpdate = true;
         this._dragonGroup.add(this._trailInstancedMesh);
 
-        // Thin arcade blast shockwave geometry (horizontal ring lying flat on the board, 128 segments)
-        this._blastGeo = new THREE.RingGeometry(0.975, 1.0, 128);
-        this._blastGeo.rotateX(-Math.PI / 2);
+        // Thin arcade blast shockwave geometry via BufferGeometryFactory
+        this._blastGeo = bufferGeometryFactory.createRingXZ(0.975, 1.0, 128);
         this._blastMat = new THREE.MeshBasicMaterial({
             color: 0x00ffcc,
             transparent: true,
@@ -285,7 +286,7 @@ export class DragonSystem {
                     if (this._parentGroup) {
                         this._parentGroup.remove(blast.mesh);
                     }
-                    blast.mesh.material.dispose();
+                    meshPoolManager.release('dragon_blast', blast.mesh);
                     this._activeBlasts.splice(j, 1);
                 } else {
                     const curRadius = blast.maxRadius * Math.sin(t * Math.PI * 0.5);
@@ -476,9 +477,11 @@ export class DragonSystem {
         // 3. Expanding thin circular shockwave ring blast
         if (this._parentGroup && this._blastGeo && this._blastMat) {
             const blastRadius = this._tileWidth * 3.8;
-            const blastMesh = new THREE.Mesh(this._blastGeo, this._blastMat.clone());
+            let blastMesh = meshPoolManager.acquire('dragon_blast', () => new THREE.Mesh(this._blastGeo, this._blastMat));
+            if (!blastMesh) blastMesh = new THREE.Mesh(this._blastGeo, this._blastMat);
             blastMesh.position.set(exitX, 0.006, exitZ);
             blastMesh.scale.set(0.001, 1, 0.001);
+            if (blastMesh.material) blastMesh.material.opacity = 0.95;
             this._parentGroup.add(blastMesh);
             this._activeBlasts.push({
                 mesh: blastMesh,
@@ -525,11 +528,11 @@ export class DragonSystem {
             this._trailInstancedMesh.instanceMatrix.needsUpdate = true;
         }
 
-        // Clean up any remaining blasts
+        // Clean up and recycle any remaining blasts
         if (this._activeBlasts && this._parentGroup) {
             for (const blast of this._activeBlasts) {
                 this._parentGroup.remove(blast.mesh);
-                blast.mesh.material.dispose();
+                meshPoolManager.release('dragon_blast', blast.mesh);
             }
             this._activeBlasts = [];
         }

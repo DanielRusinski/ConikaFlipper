@@ -249,7 +249,8 @@ export class ModifierCardSystem {
       }
     });
     
-    this._applyEffect(cardData);
+    // Immediately release pointer events so the overlay does not block targeting or gameplay
+    this._container.style.pointerEvents = 'none';
     eventBus.emit('modifier:selected', { id: this._modifierId, card: cardData });
     
     setTimeout(() => {
@@ -258,7 +259,8 @@ export class ModifierCardSystem {
       if (gameStateManager.state === GAME_STATES.MODIFIER_SELECTION) {
         gameStateManager.setState(GAME_STATES.PLAYING);
       }
-    }, 850);
+      this._applyEffect(cardData);
+    }, 420);
   }
 
   _applyEffect(card) {

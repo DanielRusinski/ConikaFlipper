@@ -6,21 +6,41 @@ import anime from 'animejs';
 export class CoinRewardSystem {
   constructor() {
     this._container = null;
-    this._unsub = null;
+    this._unsubs = [];
     this._camera = null;
     this._renderer = null;
+    this._boardGroup = null;
     this._tempPos = new THREE.Vector3();
+    this._multiplier = 1;
+    this._multiplierTimer = 0;
   }
 
   init(uiContainer, boardGroup = null) {
     this._container = uiContainer;
     this._boardGroup = boardGroup;
-    this._unsub = eventBus.on('tile:discovered', this._onTileDiscovered.bind(this));
+    this._unsubs = [
+      eventBus.on('tile:discovered', this._onTileDiscovered.bind(this)),
+      eventBus.on('finding:collected', this._onCrystalCollected.bind(this)),
+      eventBus.on('modifier:collected', this._onCrystalCollected.bind(this)),
+      eventBus.on('modifier:selected', (data) => {
+        if (data?.card?.effectType === 'scoreMultiplier') {
+          this._multiplier = data.card.effectValue || data.card.value || 2;
+          this._multiplierTimer = data.card.duration || 30;
+        }
+      })
+    ];
   }
 
-  update(camera, renderer) {
+  update(camera, renderer, dt = 0) {
     this._camera = camera;
     this._renderer = renderer;
+    if (this._multiplierTimer > 0 && dt > 0) {
+      this._multiplierTimer -= dt;
+      if (this._multiplierTimer <= 0) {
+        this._multiplier = 1;
+        this._multiplierTimer = 0;
+      }
+    }
   }
 
   _onTileDiscovered({ tileIndex, x, z, gridX, gridY }) {
@@ -36,6 +56,12 @@ export class CoinRewardSystem {
       startY = screenPos.y;
     }
 
+    // 1. Spawning dynamic on-board points popup (+10 / +50) for immediate reward feedback
+    const baseVal = coinConfig?.value || (isRed ? 50 : 10);
+    const pointsVal = baseVal * (this._multiplier || 1);
+    this._spawnPointsPopup(startX, startY, pointsVal, isRed);
+
+    // 2. Existing flying coin animation (preserved exactly as before)
     const coinEl = document.createElement('div');
     coinEl.className = 'coin-popup';
     coinEl.style.position = 'absolute';
@@ -87,6 +113,150 @@ export class CoinRewardSystem {
     });
   }
 
+  _spawnPointsPopup(startX, startY, pointsVal, isRed) {
+    if (!this._container || typeof document === 'undefined') return;
+
+    // Cap active popups to prevent DOM flooding during rapid reveals or bomb blasts
+    const active = this._container.querySelectorAll('.points-popup');
+    if (active.length >= 24) {
+      active[0].remove();
+    }
+
+    const popupEl = document.createElement('div');
+    popupEl.className = `points-popup ${isRed ? 'points-red' : 'points-yellow'}`;
+    popupEl.innerHTML = `<span class="points-plus">+</span>${pointsVal}`;
+    
+    popupEl.style.position = 'absolute';
+    popupEl.style.left = `${startX}px`;
+    popupEl.style.top = `${startY - 8}px`;
+    popupEl.style.transform = 'translate(-50%, -50%) scale(0.35)';
+    popupEl.style.opacity = '0';
+    popupEl.style.zIndex = '2450';
+    popupEl.style.pointerEvents = 'none';
+
+    this._container.appendChild(popupEl);
+
+    // Subtle horizontal jitter for lively organic motion
+    const spreadX = (Math.random() - 0.5) * 22;
+
+    anime({
+      targets: popupEl,
+      scale: [
+        { value: 0.35, duration: 0 },
+        { value: 1.45, duration: 160, easing: 'easeOutBack' },
+        { value: 1.15, duration: 220, easing: 'easeInOutQuad' },
+        { value: 0.95, duration: 250, easing: 'easeInQuad' }
+      ],
+      translateX: [
+        { value: 0, duration: 0 },
+        { value: spreadX, duration: 650, easing: 'easeOutSine' }
+      ],
+      translateY: [
+        { value: 0, duration: 0 },
+        { value: -48, duration: 650, easing: 'easeOutCubic' }
+      ],
+      opacity: [
+        { value: 0, duration: 0 },
+        { value: 1.0, duration: 100, easing: 'linear' },
+        { value: 1.0, duration: 350 },
+        { value: 0.0, duration: 200, easing: 'easeOutQuad' }
+      ],
+      duration: 650,
+      complete: () => {
+        if (popupEl.parentNode) {
+          popupEl.parentNode.removeChild(popupEl);
+        }
+      }
+    });
+  }
+
+  _onCrystalCollected(data) {
+    if (!data) return;
+    const { x, y, z, type, value, givesLife } = data;
+
+    let startX = (typeof window !== 'undefined') ? window.innerWidth / 2 : 200;
+    let startY = (typeof window !== 'undefined') ? window.innerHeight / 2 : 200;
+
+    if (this._camera && this._renderer && Number.isFinite(x) && Number.isFinite(z)) {
+      const screenPos = this.projectToScreen(x, y !== undefined ? y : 0.03, z, this._camera, this._renderer);
+      startX = screenPos.x;
+      startY = screenPos.y;
+    }
+
+    this._spawnCrystalPopup(startX, startY, type || (givesLife ? 'emerald_crystal' : 'points_crystal'), value);
+  }
+
+  _spawnCrystalPopup(startX, startY, type, value) {
+    if (!this._container || typeof document === 'undefined') return;
+
+    // Cap active crystal popups
+    const active = this._container.querySelectorAll('.crystal-popup');
+    if (active.length >= 8) {
+      active[0].remove();
+    }
+
+    const popupEl = document.createElement('div');
+    let subClass = 'crystal-popup-points';
+    let icon = '💎';
+    let text = `+${value || 250}`;
+
+    if (type === 'emerald_crystal') {
+      subClass = 'crystal-popup-emerald';
+      icon = '💚';
+      text = '+1 LIFE!';
+    } else if (type === 'modifier') {
+      subClass = 'crystal-popup-modifier';
+      icon = '🃏';
+      text = 'MODIFIER!';
+    }
+
+    popupEl.className = `crystal-popup ${subClass}`;
+    popupEl.innerHTML = `<span class="crystal-icon">${icon}</span><span class="crystal-text">${text}</span>`;
+
+    popupEl.style.position = 'absolute';
+    popupEl.style.left = `${startX}px`;
+    popupEl.style.top = `${startY - 16}px`;
+    popupEl.style.transform = 'translate(-50%, -50%) scale(0.3)';
+    popupEl.style.opacity = '0';
+    popupEl.style.zIndex = '2600';
+    popupEl.style.pointerEvents = 'none';
+
+    this._container.appendChild(popupEl);
+
+    // Subtle horizontal spread
+    const spreadX = (Math.random() - 0.5) * 16;
+
+    anime({
+      targets: popupEl,
+      scale: [
+        { value: 0.3, duration: 0 },
+        { value: 1.45, duration: 180, easing: 'easeOutBack' },
+        { value: 1.15, duration: 250, easing: 'easeInOutQuad' },
+        { value: 0.95, duration: 270, easing: 'easeInQuad' }
+      ],
+      translateX: [
+        { value: 0, duration: 0 },
+        { value: spreadX, duration: 750, easing: 'easeOutSine' }
+      ],
+      translateY: [
+        { value: 0, duration: 0 },
+        { value: -65, duration: 750, easing: 'easeOutCubic' }
+      ],
+      opacity: [
+        { value: 0, duration: 0 },
+        { value: 1.0, duration: 100, easing: 'linear' },
+        { value: 1.0, duration: 420 },
+        { value: 0.0, duration: 230, easing: 'easeOutQuad' }
+      ],
+      duration: 750,
+      complete: () => {
+        if (popupEl.parentNode) {
+          popupEl.parentNode.removeChild(popupEl);
+        }
+      }
+    });
+  }
+
   projectToScreen(worldX, worldY, worldZ, camera, renderer) {
     this._tempPos.set(worldX, worldY, worldZ);
     if (this._boardGroup) {
@@ -102,13 +272,23 @@ export class CoinRewardSystem {
   }
 
   dispose() {
-    if (this._unsub) {
-      this._unsub();
-      this._unsub = null;
+    if (this._unsubs && this._unsubs.length) {
+      for (const unsub of this._unsubs) {
+        if (typeof unsub === 'function') unsub();
+      }
+      this._unsubs = [];
     }
     const coins = this._container?.querySelectorAll('.coin-popup');
     if (coins) {
       coins.forEach(c => c.remove());
+    }
+    const popups = this._container?.querySelectorAll('.points-popup');
+    if (popups) {
+      popups.forEach(p => p.remove());
+    }
+    const crystalPopups = this._container?.querySelectorAll('.crystal-popup');
+    if (crystalPopups) {
+      crystalPopups.forEach(p => p.remove());
     }
     this._camera = null;
     this._renderer = null;
