@@ -1,4 +1,23 @@
 import * as THREE from 'three';
+export {
+    CrystalGelMaterial,
+    BoarderGelMaterialImpl,
+    BoarderGelGlitterMaterial,
+    createCrystalGelShaderMaterial,
+    setCrystalEnvironmentMap,
+    updateCrystalGelTime,
+    disposeCrystalGelMaterials,
+    CRYSTAL_GEL_PRESETS,
+    updateCrystalUniforms,
+    getActiveCrystalMaterials,
+    setCrystalTimeMultiplier,
+    getCrystalTimeMultiplier
+} from './crystalGelMaterial.js';
+export {
+    createCrystalGhostMaterial,
+    updateCrystalGhostTime,
+    disposeCrystalGhostMaterials
+} from './crystalGhostMaterial.js';
 
 const envMaterialCache = new Map();
 

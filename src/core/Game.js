@@ -45,6 +45,7 @@ import { getStageConfig, STAGE_CONFIG } from '../config/stageConfig.js';
 
 import { SettingsPanel } from '../debug/SettingsPanel.js';
 import { DebugPanel } from '../debug/DebugPanel.js';
+import { CrystalMaterialPanel } from '../debug/CrystalMaterialPanel.js';
 import { PerformanceGraph } from '../debug/PerformanceGraph.js';
 import { performanceMonitor } from '../rendering/PerformanceMonitor.js';
 import { bufferGeometryFactory } from '../rendering/BufferGeometryFactory.js';
@@ -153,6 +154,8 @@ export class Game {
         // 5. Post-processing
         this.postProcessing = new PostProcessingManager();
         this.postProcessing.init(this.renderer, this.scene, this.camera);
+        this.postProcessing.setEnabled(false);
+        this.postProcessing.setBloomEnabled(false);
         this.postProcessing.resize(window.innerWidth, window.innerHeight, this.renderer.getPixelRatio());
 
         // 6. Board group
@@ -288,6 +291,9 @@ export class Game {
 
         this.debugPanel = new DebugPanel();
         this.debugPanel.init();
+
+        this.crystalMaterialPanel = new CrystalMaterialPanel();
+        this.crystalMaterialPanel.init();
 
         this.performanceGraph = new PerformanceGraph();
         this.performanceGraph.init();
@@ -870,15 +876,15 @@ export class Game {
             // with generous 2/3 margins above and below while ball remains centered
             const aspect = this.camera.aspect || (window.innerWidth / window.innerHeight);
             const aspectFactor = Math.max(0.40, Math.min(1.0, aspect / 0.85));
-            const baseHeight = (0.75 / aspectFactor) * this._cameraZoom;
-            const baseZOffset = baseHeight * 0.48;
+            const baseHeight = (0.50 / aspectFactor) * this._cameraZoom;
+            const baseZOffset = baseHeight * 0.44;
 
             // Intelligent tracking: blend zone center framing with real-time ball position
-            const normLookAtX = ball3DX * 0.55;
+            const normLookAtX = ball3DX * 0.70;
             const normLookAtY = 0;
-            const normLookAtZ = zoneCenterZ * 0.40 + ball3DZ * 0.60;
+            const normLookAtZ = zoneCenterZ * 0.20 + ball3DZ * 0.80;
 
-            const normCamTargetX = ball3DX * 0.50;
+            const normCamTargetX = ball3DX * 0.65;
             const normCamTargetY = baseHeight;
             const normCamTargetZ = normLookAtZ + baseZOffset;
 
@@ -1604,6 +1610,7 @@ export class Game {
         this.performanceGraph.dispose();
         this.debugPanel.dispose();
         this.settingsPanel.dispose();
+        if (this.crystalMaterialPanel) this.crystalMaterialPanel.dispose();
         this.labelSystem.dispose();
         this.screenManager.dispose();
         this.gameHUD.dispose();

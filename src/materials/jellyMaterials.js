@@ -162,6 +162,8 @@ export function getJellyEnvironmentMap() {
   return _cachedExrTexture;
 }
 
+export const getJellyExrMap = getJellyEnvironmentMap;
+
 /**
  * Pomocnicza funkcja normalizująca parametry i tworząca unikalną instancję MeshPhysicalMaterial.
  * 

@@ -7,6 +7,6 @@ export const GAME_CONFIG = {
   lives: { starting:3 },
   timer: { startingSeconds:300 },
   slowMotion: { scale:0.04 },
-  camera: { height:1.2, followStrength:0.25, lerpSpeed:4.0, zOffset:0.7 },
+  camera: { height:0.85, followStrength:0.35, lerpSpeed:4.5, zOffset:0.44 },
   spawn: { defaultGridX:9, defaultGridY:18 }
 };
