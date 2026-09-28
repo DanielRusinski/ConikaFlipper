@@ -4,6 +4,7 @@ import { LIGHTING_CONFIG } from '../config/lightingConfig.js';
 import { eventBus } from '../core/EventBus.js';
 import { setJellyEnvironmentMap } from '../materials/jellyMaterials.js';
 import { setTileEnvironmentMap } from '../materials/tileMaterials.js';
+import { setCrystalEnvironmentMap } from '../materials/crystalGelMaterial.js';
 
 export class LightingSystem {
     constructor() {
@@ -65,6 +66,7 @@ export class LightingSystem {
             this.environmentTexture = texture;
             setJellyEnvironmentMap(texture);
             setTileEnvironmentMap(texture);
+            setCrystalEnvironmentMap(texture);
         }, undefined, (error) => {
             console.warn('EXR ambient lighting load failed:', error);
         });

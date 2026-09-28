@@ -85,7 +85,7 @@ export class PostProcessingManager {
         this.bloomPass = null;
         this.grainPass = null;
         this.outputPass = null;
-        this.enabled = true;
+        this.enabled = false;
         this._qualityUnsub = null;
         this._eventUnsubs = [];
 
@@ -117,6 +117,7 @@ export class PostProcessingManager {
         this.bloomPass.strength = 0.62;
         this.bloomPass.radius = 1.05;
         this.bloomPass.threshold = 0.60;
+        this.bloomPass.enabled = false;
         this.composer.addPass(this.bloomPass);
 
         this.grainPass = new ShaderPass(FilmGrainShader);
@@ -219,9 +220,9 @@ export class PostProcessingManager {
 
         // When postProcessing is explicitly disabled (e.g. LOW quality tier),
         // we bypass the EffectComposer completely, rendering directly with WebGLRenderer.
-        this.enabled = qualityConfig.postProcessing !== false;
+        this.enabled = Boolean(qualityConfig && qualityConfig.postProcessing === true);
 
-        const useBloom = qualityConfig.bloomEnabled === true;
+        const useBloom = Boolean(qualityConfig && qualityConfig.bloomEnabled === true);
         if (this.bloomPass) {
             this.bloomPass.enabled = useBloom;
             if (qualityConfig.bloomStrength !== undefined) this.bloomPass.strength = qualityConfig.bloomStrength;
