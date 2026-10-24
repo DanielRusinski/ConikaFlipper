@@ -1,0 +1,100 @@
+
+/* Icon Atlas System */
+.atlas-icon {
+  display: inline-block;
+  vertical-align: middle;
+  background-image: url('../assets/icon-atlas.png');
+  background-repeat: no-repeat;
+  background-size: 800% 800%;
+  flex-shrink: 0;
+  width: 2em;
+  height: 2em;
+  overflow: visible;
+}
+
+
+#timer-display .atlas-icon,
+#lives-display .atlas-icon {
+  width: 2.4em;
+  height: 2.4em;
+}
+
+.coin-dot .atlas-icon {
+  width: 32px;
+  height: 32px;
+}
+
+/* Allow icons to extend over boundary of parent containers */
+.shop-item-icon,
+.shop-detail-icon,
+.battle-menu-slot,
+.battle-orb-inner,
+.loadout-slots-grid,
+.hud-icon-box {
+  overflow: visible !important;
+}
+
+.icon-coin_yellow { background-position: 0.0000% 0.0000%; }
+.icon-coin_red { background-position: 14.2857% 0.0000%; }
+.icon-timer { background-position: 28.5714% 0.0000%; }
+.icon-heart { background-position: 42.8571% 0.0000%; }
+.icon-lightning { background-position: 57.1429% 0.0000%; }
+.icon-bomb { background-position: 71.4286% 0.0000%; }
+.icon-pause { background-position: 85.7143% 0.0000%; }
+.icon-trophy { background-position: 100.0000% 0.0000%; }
+.icon-target { background-position: 0.0000% 14.2857%; }
+.icon-shop_bag { background-position: 14.2857% 14.2857%; }
+.icon-crystal { background-position: 28.5714% 14.2857%; }
+.icon-close { background-position: 42.8571% 14.2857%; }
+.icon-cart { background-position: 57.1429% 14.2857%; }
+.icon-money_bag { background-position: 71.4286% 14.2857%; }
+.icon-package { background-position: 85.7143% 14.2857%; }
+.icon-warning { background-position: 100.0000% 14.2857%; }
+.icon-ring { background-position: 0.0000% 28.5714%; }
+.icon-potion { background-position: 14.2857% 28.5714%; }
+.icon-swords { background-position: 28.5714% 28.5714%; }
+.icon-shield { background-position: 42.8571% 28.5714%; }
+.icon-crystal_orb { background-position: 57.1429% 28.5714%; }
+.icon-magnet { background-position: 71.4286% 28.5714%; }
+.icon-hourglass { background-position: 85.7143% 28.5714%; }
+.icon-clover { background-position: 100.0000% 28.5714%; }
+.icon-heart_sparkle { background-position: 0.0000% 42.8571%; }
+.icon-dagger { background-position: 14.2857% 42.8571%; }
+.icon-hammer { background-position: 28.5714% 42.8571%; }
+.icon-dragon { background-position: 42.8571% 42.8571%; }
+.icon-diamond_dot { background-position: 57.1429% 42.8571%; }
+.icon-sparkles { background-position: 71.4286% 42.8571%; }
+.icon-diamond_orange { background-position: 85.7143% 42.8571%; }
+.icon-diamond_red { background-position: 100.0000% 42.8571%; }
+.icon-heart_green { background-position: 0.0000% 57.1429%; }
+.icon-ball_white { background-position: 14.2857% 57.1429%; }
+.icon-ball_yellow { background-position: 28.5714% 57.1429%; }
+.icon-ball_wood { background-position: 42.8571% 57.1429%; }
+.icon-ball_purple { background-position: 57.1429% 57.1429%; }
+.icon-tennis_ball { background-position: 71.4286% 57.1429%; }
+.icon-joystick { background-position: 85.7143% 57.1429%; }
+.icon-lock { background-position: 100.0000% 57.1429%; }
+.icon-star { background-position: 0.0000% 71.4286%; }
+.icon-wind { background-position: 14.2857% 71.4286%; }
+.icon-card { background-position: 28.5714% 71.4286%; }
+.icon-palette { background-position: 42.8571% 71.4286%; }
+.icon-gamepad { background-position: 57.1429% 71.4286%; }
+.icon-phone { background-position: 71.4286% 71.4286%; }
+.icon-rotate { background-position: 85.7143% 71.4286%; }
+.icon-arrow_forward { background-position: 100.0000% 71.4286%; }
+.icon-zoom_in { background-position: 0.0000% 85.7143%; }
+.icon-zoom_out { background-position: 14.2857% 85.7143%; }
+.icon-reset_view { background-position: 28.5714% 85.7143%; }
+.icon-undo { background-position: 42.8571% 85.7143%; }
+.icon-redo { background-position: 57.1429% 85.7143%; }
+.icon-diff { background-position: 71.4286% 85.7143%; }
+.icon-camera { background-position: 85.7143% 85.7143%; }
+.icon-export_box { background-position: 100.0000% 85.7143%; }
+.icon-import_box { background-position: 0.0000% 100.0000%; }
+.icon-save_disk { background-position: 14.2857% 100.0000%; }
+.icon-check_mark { background-position: 28.5714% 100.0000%; }
+.icon-balance_scale { background-position: 42.8571% 100.0000%; }
+.icon-chart_bar { background-position: 57.1429% 100.0000%; }
+.icon-chart_up { background-position: 71.4286% 100.0000%; }
+.icon-bug { background-position: 85.7143% 100.0000%; }
+.icon-app_icon { background-position: 100.0000% 100.0000%; }
