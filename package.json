@@ -1,0 +1,24 @@
+{
+  "name": "opt-flipper",
+  "version": "2.0.0",
+  "description": "OPT Flipper Arcade Pinball Game and Balance Editor",
+  "type": "module",
+  "scripts": {
+    "test": "node --test-concurrency=1 --test tests/*.test.js",
+    "game": "node tools/balanceDevServer.js",
+    "balance:editor": "node tools/balanceDevServer.js",
+    "dev:balance": "node tools/balanceDevServer.js",
+    "balance:validate": "node tools/syncBalanceTables.js --validate",
+    "balance:export": "node tools/syncBalanceTables.js --export",
+    "balance:import": "node tools/syncBalanceTables.js --import",
+    "balance:test": "node --test tests/balanceEditorApi.test.js"
+  },
+  "keywords": [
+    "pinball",
+    "arcade",
+    "balance-editor",
+    "gameplay"
+  ],
+  "author": "Google Deepmind Team",
+  "license": "UNLICENSED"
+}
