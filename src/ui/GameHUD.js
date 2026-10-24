@@ -1,0 +1,381 @@
+import { eventBus } from '../core/EventBus.js';
+import { inputManager } from '../core/InputManager.js';
+import { GAME_CONFIG } from '../config/gameConfig.js';
+import { BALL_COLORS, BALL_CSS_COLORS, BALL_DISPLAY_NAMES } from '../materials/ballMaterials.js';
+import { ScoreDisplay } from './ScoreDisplay.js';
+import { renderIconHTML } from './IconService.js';
+import anime from 'animejs';
+
+export class GameHUD {
+  constructor() {
+    this._scoreDisplay = new ScoreDisplay({ digitCount: 6, digitHeight: 34, digitWidth: 18, fontSize: '22px', color: '#ffd700', customStyling: true });
+    this._yellowScoreDisplay = new ScoreDisplay({ digitCount: 4, digitHeight: 22, digitWidth: 11, fontSize: '13px', color: '#ffd93d', customStyling: false });
+    this._redScoreDisplay = new ScoreDisplay({ digitCount: 4, digitHeight: 22, digitWidth: 11, fontSize: '13px', color: '#ff6b6b', customStyling: false });
+    this._tilesRemainingDisplay = new ScoreDisplay({ digitCount: 4, digitHeight: 22, digitWidth: 11, fontSize: '13px', color: '#00e5ff', customStyling: false });
+    this._livesEl = null;
+    this._timerEl = null;
+    this._ballIndicatorEl = null;
+    this._modifierEl = null;
+    this._battleBtn = null;
+    this._battleOrbBtn = null;
+    this._pauseBtn = null;
+    this._selectionBannerEl = null;
+    this._launchBtn = null;
+    this._unsubs = [];
+    this._hudContainer = null;
+  }
+
+  init(hudContainer) {
+    this._hudContainer = hudContainer;
+    
+    // Create DOM structure matching responsive layout:
+    // Left: Time & Lives directly above Score, followed by Tiles Left, Coins restored to original position, and Active Bonuses underneath
+    // Bottom: Ball indicator (left), unobstructed Battle Orb button (center), Bomb & Pause (right)
+    hudContainer.innerHTML = `
+      <div id="hud-top-bar">
+        <div class="hud-left-column">
+          <div class="hud-status-row">
+            <div id="timer-display" class="hud-item"><span>${renderIconHTML('timer')}</span><span>05:00</span></div>
+            <div id="lives-display" class="hud-item">${renderIconHTML('heart')} 3</div>
+          </div>
+          <div id="total-score-card" class="hud-item score-card">
+            <span class="hud-title-badge">SCORE</span>
+            <div id="score-display"></div>
+          </div>
+          <div id="tiles-remaining-card" class="hud-item tiles-card">
+            <span class="hud-title-badge tiles-badge">TILES LEFT</span>
+            <div id="tiles-remaining-slot" class="tiles-slot"></div>
+          </div>
+          <div class="hud-coins-box">
+            <div id="yellow-coins-display" class="hud-item coin-counter yellow">
+              <span class="coin-dot">${renderIconHTML('coin_yellow')}</span>
+              <div id="yellow-coins-slot" class="coin-slot"></div>
+            </div>
+            <div id="red-coins-display" class="hud-item coin-counter red">
+              <span class="coin-dot">${renderIconHTML('coin_red')}</span>
+              <div id="red-coins-slot" class="coin-slot"></div>
+            </div>
+          </div>
+          <div id="active-modifier" class="hud-active-modifier"></div>
+        </div>
+      </div>
+
+      <div id="hud-bottom-bar">
+        <div id="hud-ball-container" style="display:inline-flex; flex-direction:column; align-items:center; gap:2px; pointer-events:auto;">
+          <div style="position:relative; display:inline-block;">
+            <button id="ball-indicator" class="hud-ball-btn" type="button" title="Current Ball (Tap to customize)" aria-label="Change Ball"></button>
+            <div id="hud-ball-level-badge" style="position:absolute; bottom:-3px; right:-5px; background:linear-gradient(135deg, #00f0ff, #0077b6); color:#fff; font-size:10px; font-weight:800; padding:1px 4px; border-radius:8px; border:1px solid #fff; pointer-events:none; box-shadow:0 2px 6px rgba(0,0,0,0.6);">Lv.1</div>
+          </div>
+          <div id="hud-ball-xp-bar-wrap" style="width:42px; height:4px; background:rgba(0,0,0,0.6); border-radius:2px; overflow:hidden; border:1px solid rgba(255,255,255,0.25);" title="XP Progress">
+            <div id="hud-ball-xp-bar" style="width:0%; height:100%; background:linear-gradient(90deg, #00ffcc, #00f0ff); transition:width 0.3s ease;"></div>
+          </div>
+        </div>
+
+        <!-- Central circular semi-transparent Battle/Equipment Orb button -->
+        <button id="battle-orb-btn" class="battle-orb-btn" type="button" title="Opcje i Ekwipunek (Battle Menu)" aria-label="Battle Menu">
+          <div class="battle-orb-inner">
+            <span class="battle-orb-icon">${renderIconHTML('lightning', { size: '44px' })}</span>
+          </div>
+          <div class="battle-orb-glow"></div>
+        </button>
+
+        <div style="display:flex; gap:10px; pointer-events:auto; align-items:center;">
+          <button id="bomb-action-btn" class="hud-touch-btn bomb-hud-btn" type="button" style="display:none; pointer-events:auto; background:linear-gradient(180deg, rgba(50, 18, 18, 0.94), rgba(28, 8, 8, 0.98)); border:1.5px solid rgba(255, 69, 58, 0.7); border-radius:12px; padding:8px 16px; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 14px rgba(255, 69, 58, 0.35); align-items:center; gap:6px;">${renderIconHTML('bomb', { size: '36px' })} <span id="bomb-btn-count">0</span></button>
+          <button id="pause-btn" class="hud-touch-btn" type="button" style="pointer-events:auto; background:linear-gradient(180deg, rgba(26, 36, 62, 0.92), rgba(13, 19, 36, 0.96)); border:1.5px solid rgba(120, 180, 255, 0.45); border-radius:12px; padding:8px 16px; color:#fff; font-size:14px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 180, 255, 0.2); display:inline-flex; align-items:center; gap:6px;">${renderIconHTML('pause', { size: '36px' })} Pause</button>
+        </div>
+      </div>
+    `;
+
+    const scoreContainer = document.getElementById('score-display');
+    this._scoreDisplay.init(scoreContainer);
+
+    const yellowSlot = document.getElementById('yellow-coins-slot');
+    this._yellowScoreDisplay.init(yellowSlot);
+
+    const redSlot = document.getElementById('red-coins-slot');
+    this._redScoreDisplay.init(redSlot);
+
+    const tilesSlot = document.getElementById('tiles-remaining-slot');
+    if (tilesSlot) {
+      this._tilesRemainingDisplay.init(tilesSlot);
+    }
+
+    this._livesEl = document.getElementById('lives-display');
+    this._timerEl = document.getElementById('timer-display');
+    this._ballIndicatorEl = document.getElementById('ball-indicator');
+    this._ballLevelBadgeEl = document.getElementById('hud-ball-level-badge');
+    this._ballXpBarEl = document.getElementById('hud-ball-xp-bar');
+    this._modifierEl = document.getElementById('active-modifier');
+    this._bombBtn = document.getElementById('bomb-action-btn');
+    this._bombCountSpan = document.getElementById('bomb-btn-count');
+    this._battleOrbBtn = document.getElementById('battle-orb-btn');
+    this._pauseBtn = document.getElementById('pause-btn');
+
+    // Robust tap & click handler supporting mouse, touchscreen, and stylus
+    const attachButtonTrigger = (btn, onTrigger) => {
+      if (!btn) return;
+      let handledViaPointer = false;
+
+      btn.addEventListener('pointerup', (e) => {
+        handledViaPointer = true;
+        e.preventDefault();
+        e.stopPropagation();
+        onTrigger();
+        setTimeout(() => { handledViaPointer = false; }, 350);
+      });
+
+      btn.addEventListener('click', (e) => {
+        if (handledViaPointer) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onTrigger();
+      });
+    };
+
+    attachButtonTrigger(this._battleOrbBtn, () => {
+      eventBus.emit('ui:battleMenuRequested');
+    });
+
+    attachButtonTrigger(this._pauseBtn, () => {
+      eventBus.emit('ui:pauseRequested');
+    });
+
+    attachButtonTrigger(this._ballIndicatorEl, () => {
+      eventBus.emit('ui:equipmentRequested');
+    });
+
+    const landscapeLockBtn = document.getElementById('landscape-lock-btn');
+    if (landscapeLockBtn) {
+      attachButtonTrigger(landscapeLockBtn, async () => {
+        await inputManager.requestFullscreenAndLock();
+      });
+    }
+
+    if (this._bombBtn) {
+      attachButtonTrigger(this._bombBtn, () => {
+        eventBus.emit('ui:toggleBombTargeting');
+      });
+    }
+
+    const coinsBox = document.querySelector('.hud-coins-box');
+    if (coinsBox) {
+      coinsBox.style.cursor = 'pointer';
+      attachButtonTrigger(coinsBox, () => {
+        eventBus.emit('ui:shopRequested', { context: 'IN_LEVEL_SHOP_TILE' });
+      });
+    }
+
+    this._unsubs.push(
+      eventBus.on('score:changed', (data) => {
+        this._scoreDisplay.setValue(data.score || 0);
+      }),
+      eventBus.on('currency:changed', (data) => {
+        if (data) {
+          if (data.yellowCoins !== undefined) {
+            this._yellowScoreDisplay.setValue(data.yellowCoins);
+          }
+          if (data.redCoins !== undefined) {
+            this._redScoreDisplay.setValue(data.redCoins);
+          }
+        }
+      }),
+      eventBus.on('tiles:changed', (data) => {
+        if (data && data.remaining !== undefined) {
+          this._tilesRemainingDisplay.setValue(data.remaining);
+          const tilesSlotEl = document.getElementById('tiles-remaining-slot');
+          if (tilesSlotEl) {
+            if (data.remaining <= 5 && data.remaining > 0) {
+              tilesSlotEl.style.boxShadow = '0 0 14px rgba(255, 204, 0, 0.7)';
+              tilesSlotEl.style.borderColor = 'rgba(255, 204, 0, 0.9)';
+            } else {
+              tilesSlotEl.style.boxShadow = '';
+              tilesSlotEl.style.borderColor = '';
+            }
+          }
+        }
+      }),
+      eventBus.on('life:changed', (lives) => this._updateLives(lives)),
+      eventBus.on('timer:changed', (data) => this._updateTimer(data.time, data.formatted, data.added)),
+      eventBus.on('ball:typeChanged', (data) => this._updateBallIndicator(data.type)),
+      eventBus.on('ball:progressionChanged', (data) => this._updateBallProgression(data)),
+      eventBus.on('ball:leveledUp', (data) => this._updateBallProgression(data)),
+      eventBus.on('modifier:selected', (data) => this._updateModifier(data.card)),
+      eventBus.on('bomb:countChanged', ({ count, capacity }) => {
+        if (!this._bombBtn || !this._bombCountSpan) return;
+        this._bombCountSpan.textContent = capacity !== undefined ? `${count} / ${capacity}` : count;
+        if (count > 0 || (capacity !== undefined && capacity > 0)) {
+          this._bombBtn.style.display = 'inline-flex';
+        } else {
+          this._bombBtn.style.display = 'none';
+        }
+      }),
+      eventBus.on('bomb:targetingChanged', ({ active }) => {
+        if (!this._bombBtn) return;
+        if (active) {
+          this._bombBtn.style.borderColor = '#00ffcc';
+          this._bombBtn.style.boxShadow = '0 0 16px rgba(0, 255, 204, 0.7)';
+        } else {
+          this._bombBtn.style.borderColor = 'rgba(255, 69, 58, 0.7)';
+          this._bombBtn.style.boxShadow = '0 4px 14px rgba(0, 0, 0, 0.55), 0 0 14px rgba(255, 69, 58, 0.35)';
+        }
+      }),
+      eventBus.on('battleMenu:stateChanged', ({ active }) => {
+        if (this._battleOrbBtn) {
+          if (active) {
+            this._battleOrbBtn.classList.add('active');
+          } else {
+            this._battleOrbBtn.classList.remove('active');
+          }
+        }
+      })
+    );
+
+    this._updateLives(GAME_CONFIG.lives?.starting || 3);
+    this._updateTimer(GAME_CONFIG.timer?.startingSeconds || 300, '05:00');
+    this._updateBallIndicator(GAME_CONFIG.ball?.defaultType || 'brass');
+  }
+
+  showSelectionBanner(onLaunch) {
+    // Selection banner removed per user request
+  }
+
+  hideSelectionBanner() {
+    // Selection banner removed per user request
+  }
+
+  _updateLives(lives) {
+    const count = (typeof lives === 'object' && lives !== null) ? (lives.lives ?? 0) : (lives ?? 0);
+    this._livesEl.innerHTML = `${renderIconHTML('heart')} ${count}`;
+  }
+
+  _updateTimer(time, formatted, added) {
+    const text = formatted || (time !== undefined ? `${Math.floor(time / 60).toString().padStart(2, '0')}:${Math.floor(time % 60).toString().padStart(2, '0')}` : '05:00');
+    this._timerEl.innerHTML = `<span>${renderIconHTML('timer')}</span><span>${text}</span>`;
+
+    if (added && added > 0) {
+      // Glow pulse on timer box
+      this._timerEl.style.borderColor = '#00ffcc';
+      this._timerEl.style.boxShadow = '0 0 20px rgba(0, 255, 204, 0.7), inset 0 0 8px rgba(0, 255, 204, 0.4)';
+
+      anime({
+        targets: this._timerEl,
+        scale: [1, 1.18, 1],
+        duration: 500,
+        easing: 'easeOutBack',
+        complete: () => {
+          setTimeout(() => {
+            this._timerEl.style.borderColor = '';
+            this._timerEl.style.boxShadow = '';
+          }, 400);
+        }
+      });
+
+      // Floating +XXs badge rising above timer
+      const badge = document.createElement('div');
+      badge.className = 'timer-bonus-badge';
+      badge.innerHTML = `+${added}s ${renderIconHTML('timer')}`;
+      this._timerEl.appendChild(badge);
+
+      anime({
+        targets: badge,
+        translateY: [0, -22],
+        opacity: [1, 0],
+        duration: 1200,
+        easing: 'easeOutQuad',
+        complete: () => {
+          if (badge.parentNode) badge.parentNode.removeChild(badge);
+        }
+      });
+    }
+  }
+
+  _updateBallIndicator(type) {
+    const key = (type || 'brass').toLowerCase();
+    const color = BALL_CSS_COLORS ? BALL_CSS_COLORS[key] : '#d4a84b';
+    if (key === 'chrome') {
+      this._ballIndicatorEl.style.background = `linear-gradient(180deg, #f8fafc 0%, #cbd5e1 35%, #181926 37%, #bf00ff 43%, #ff88ff 50%, #bf00ff 57%, #181926 63%, #cbd5e1 65%, #64748b 100%)`;
+      this._ballIndicatorEl.style.boxShadow = '0 0 12px rgba(191, 0, 255, 0.85), inset 0 0 4px rgba(255, 255, 255, 0.5)';
+      this._ballIndicatorEl.style.borderColor = '#bf00ff';
+    } else {
+      this._ballIndicatorEl.style.background = `radial-gradient(circle at 35% 35%, #ffffff 0%, ${color} 50%, rgba(0,0,0,0.7) 100%)`;
+      this._ballIndicatorEl.style.boxShadow = '';
+      this._ballIndicatorEl.style.borderColor = 'rgba(255,255,255,0.3)';
+    }
+    const displayName = (typeof BALL_DISPLAY_NAMES !== 'undefined' && BALL_DISPLAY_NAMES[key]) ? BALL_DISPLAY_NAMES[key] : key;
+    this._ballIndicatorEl.title = `Current ball: ${displayName} (Click to change)`;
+  }
+
+  _updateBallProgression(data) {
+    if (!data) return;
+    const level = data.level !== undefined ? data.level : 1;
+    if (this._ballLevelBadgeEl) {
+      this._ballLevelBadgeEl.textContent = `Lv.${level}`;
+      if (level >= 9) {
+        this._ballLevelBadgeEl.style.background = 'linear-gradient(135deg, #ffd700, #ff8800)';
+        this._ballLevelBadgeEl.style.color = '#000';
+      } else {
+        this._ballLevelBadgeEl.style.background = 'linear-gradient(135deg, #00f0ff, #0077b6)';
+        this._ballLevelBadgeEl.style.color = '#fff';
+      }
+    }
+
+    if (this._ballXpBarEl) {
+      if (level >= 9) {
+        this._ballXpBarEl.style.width = '100%';
+        this._ballXpBarEl.style.background = 'linear-gradient(90deg, #ffd700, #ff8800)';
+      } else {
+        const currentXp = data.currentXp || 0;
+        const requiredXp = data.requiredXp || 500;
+        const pct = Math.min(100, Math.max(0, Math.round((currentXp / requiredXp) * 100)));
+        this._ballXpBarEl.style.width = `${pct}%`;
+        this._ballXpBarEl.style.background = 'linear-gradient(90deg, #00ffcc, #00f0ff)';
+      }
+    }
+  }
+
+  _updateModifier(card) {
+    if (!card) return;
+    this._modifierEl.style.display = 'block';
+    this._modifierEl.innerText = `Active: ${card.title}`;
+    
+    anime.remove(this._modifierEl);
+    this._modifierEl.style.opacity = 1;
+
+    setTimeout(() => {
+      anime({
+        targets: this._modifierEl,
+        opacity: 0,
+        duration: 500,
+        easing: 'linear',
+        complete: () => {
+          this._modifierEl.style.display = 'none';
+        }
+      });
+    }, (card.duration || 10) * 1000);
+  }
+
+  show() {
+    this._hudContainer.style.display = 'flex';
+  }
+
+  hide() {
+    this._hudContainer.style.display = 'none';
+  }
+
+  update(delta) {
+    this._scoreDisplay.update(delta);
+    if (this._yellowScoreDisplay) this._yellowScoreDisplay.update(delta);
+    if (this._redScoreDisplay) this._redScoreDisplay.update(delta);
+  }
+
+  dispose() {
+    this._unsubs.forEach(u => u());
+    this._unsubs = [];
+    this._scoreDisplay.dispose();
+    if (this._yellowScoreDisplay) this._yellowScoreDisplay.dispose();
+    if (this._redScoreDisplay) this._redScoreDisplay.dispose();
+    if (this._hudContainer) {
+      this._hudContainer.innerHTML = '';
+    }
+  }
+}
