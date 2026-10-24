@@ -1,0 +1,427 @@
+{
+  "sheetKey": "14_DECISIONS_AND_ASSUMPTIONS",
+  "header": [
+    "DECISION_ID",
+    "DECISION_TYPE",
+    "TITLE",
+    "STATUS",
+    "APPROVED_CHOICE",
+    "RATIONALE",
+    "TARGET_WORK_PACKAGE",
+    "VALUE_STATUS"
+  ],
+  "rowCount": 41,
+  "exportedAt": "2026-10-24T23:08:30.569Z",
+  "rows": [
+    {
+      "DECISION_ID": "DEC_001",
+      "DECISION_TYPE": "ARCHITECTURE",
+      "TITLE": "9-Ball Progression Model",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Levels 1 to 9 per ball",
+      "RATIONALE": "Establishes fine-grained progression without exponential bloat",
+      "TARGET_WORK_PACKAGE": "WP2 / WP7 / WP8",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_002",
+      "DECISION_TYPE": "CURRENCY",
+      "TITLE": "XP Decoupling",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Dedicated Ball XP",
+      "RATIONALE": "Prevents spending gameplay score or coins on level ups",
+      "TARGET_WORK_PACKAGE": "WP2 / WP8",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_003",
+      "DECISION_TYPE": "CURRENCY",
+      "TITLE": "Crystarium Spending Currency",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Skill Points (SP) earned on level up",
+      "RATIONALE": "Score remains ephemeral run metric; SP governs trees",
+      "TARGET_WORK_PACKAGE": "WP2 / WP9",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_004",
+      "DECISION_TYPE": "CURRENCY",
+      "TITLE": "Yellow and Red Coin Persistence",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Account-wide persistent currencies",
+      "RATIONALE": "Shop economy remains stable and accessible across all balls",
+      "TARGET_WORK_PACKAGE": "WP2 / WP10",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_005",
+      "DECISION_TYPE": "CRYSTARIUM",
+      "TITLE": "Progression Completion Model",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Full 7-node completion (8 total SP)",
+      "RATIONALE": "Player can unlock all nodes by Level 9 without permanent lockouts",
+      "TARGET_WORK_PACKAGE": "WP2 / WP9",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_006",
+      "DECISION_TYPE": "CRYSTARIUM",
+      "TITLE": "Apex vs Mastery Terminology",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Level 6 Apex Ability; Level 9 Mastery Node",
+      "RATIONALE": "Eliminates terminology collision across specifications",
+      "TARGET_WORK_PACKAGE": "WP2 / WP9",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_007",
+      "DECISION_TYPE": "MIGRATION",
+      "TITLE": "Legacy Crystarium Grandfathering",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Preserve unlocked nodes with SP credit",
+      "RATIONALE": "Existing players retain investments without artificial level skipping",
+      "TARGET_WORK_PACKAGE": "WP2 / WP4 / WP9",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_008",
+      "DECISION_TYPE": "CONSUMABLE",
+      "TITLE": "Bomb Pack Storage & Battle Use",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Stored consumable in persistent inventory",
+      "RATIONALE": "Prevents shop purchase lockouts and adds tactical battle deployment",
+      "TARGET_WORK_PACKAGE": "WP2 / WP10",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_009",
+      "DECISION_TYPE": "PERSISTENCE",
+      "TITLE": "Event-Based Checkpoint Persistence",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Save on XP gain; level up; stage clear",
+      "RATIONALE": "Eliminates reliance on fragile browser unload handlers",
+      "TARGET_WORK_PACKAGE": "WP2 / WP4",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_010",
+      "DECISION_TYPE": "INPUT_VS_PHYSICS",
+      "TITLE": "Tilt Sensitivity vs Speed Scale",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Decouple input.tiltSensitivity from ball.speedScale",
+      "RATIONALE": "User settings tune tilt responsiveness without breaking game speed balance",
+      "TARGET_WORK_PACKAGE": "WP1 / WP5 / WP7",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_011",
+      "DECISION_TYPE": "DEBUG",
+      "TITLE": "Debug Ball Speed Scale Override",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Neutral-default debug control with safety clamps",
+      "RATIONALE": "Allows testing while protecting physics simulation from tunneling",
+      "TARGET_WORK_PACKAGE": "WP1 / WP5",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_012",
+      "DECISION_TYPE": "PILOT",
+      "TITLE": "BombSystem Pilot Migration",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Migrate BombSystem first in WP6",
+      "RATIONALE": "Validates ResolvedStatService with a self-contained combat system",
+      "TARGET_WORK_PACKAGE": "WP2 / WP6",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_013",
+      "DECISION_TYPE": "EQUIPMENT",
+      "TITLE": "Canonical Equipment Slots",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "6 Slots: Weapon; Shield; Accessory; Crystal; Consumable; Orb",
+      "RATIONALE": "Clean modular slot architecture matching RPG gear standards",
+      "TARGET_WORK_PACKAGE": "WP2 / WP10",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_014",
+      "DECISION_TYPE": "STAT_RESOLUTION",
+      "TITLE": "8-Stage Modifier Resolution Order",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Deterministic Base -> Flat -> Percent -> Multiply -> Clamp",
+      "RATIONALE": "Eliminates modifier order-of-operation race conditions",
+      "TARGET_WORK_PACKAGE": "WP2 / WP5",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_015",
+      "DECISION_TYPE": "SHADOW_MODE",
+      "TITLE": "ResolvedStatService Shadow Execution",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Compare resolved stats against legacy without runtime mutation",
+      "RATIONALE": "Guarantees 100% numerical safety before live handover",
+      "TARGET_WORK_PACKAGE": "WP2 / WP5",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_016",
+      "DECISION_TYPE": "MODIFIER_OPERATIONS",
+      "TITLE": "Explicit Standard Operations",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "FLAT_ADD; PERCENT_ADD; MULTIPLY; OVERRIDE; ENABLE",
+      "RATIONALE": "Standardizes mathematical treatment of all modifiers",
+      "TARGET_WORK_PACKAGE": "WP2 / WP5",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_017",
+      "DECISION_TYPE": "PERCENT_FRACTIONS",
+      "TITLE": "Fractional Percent Representation",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Decimals (<1.0) represent fractional percentages",
+      "RATIONALE": "Prevents 100x magnification bugs in balance calculations",
+      "TARGET_WORK_PACKAGE": "WP2 / WP3",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_018",
+      "DECISION_TYPE": "RULE_10",
+      "TITLE": "Strict Non-Zero Missing Data Handling",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Explicit markers (NONE/NOT_APPLICABLE); never silent 0",
+      "RATIONALE": "Guarantees missing design inputs produce errors rather than fake balance",
+      "TARGET_WORK_PACKAGE": "WP2 / WP3",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_019",
+      "DECISION_TYPE": "SAVING",
+      "TITLE": "Save Schema Versioning & Backups",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Auto-migration with automatic backup snapshots",
+      "RATIONALE": "Prevents player save corruption across game updates",
+      "TARGET_WORK_PACKAGE": "WP2 / WP4",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_020",
+      "DECISION_TYPE": "DIFFICULTY",
+      "TITLE": "Dynamic Hazard Scaling",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Stage-based scaling with safety bounds",
+      "RATIONALE": "Maintains escalating challenge while respecting BFS solvability",
+      "TARGET_WORK_PACKAGE": "WP2 / WP11",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "DEC_021",
+      "DECISION_TYPE": "WORKBOOK_SYNC",
+      "TITLE": "Automated CI Balance Validation",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Automated test asserts workbook integrity",
+      "RATIONALE": "Prevents broken stat keys or invalid curves from entering production",
+      "TARGET_WORK_PACKAGE": "WP2 / WP3 / WP12",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_001",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Bomb Pack Partial Grant Consumption",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Consume on partial grant; discard remainder",
+      "RATIONALE": "Standard arcade consumable rule prevents infinite item farming",
+      "TARGET_WORK_PACKAGE": "WP2 / WP10",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_002",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Marble Poise Knockback Resistance",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Reduces bumper impulse by up to 35%",
+      "RATIONALE": "Cementing Marble identity as heavy defensive anchor",
+      "TARGET_WORK_PACKAGE": "WP2 / WP7",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_003",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Wood Agility Acceleration Profile",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Higher control responsiveness and tilt grip",
+      "RATIONALE": "Cementing Wood identity as nimble utility harvester",
+      "TARGET_WORK_PACKAGE": "WP2 / WP7",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_004",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Chrome High-Risk Glass Cannon Profile",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Top velocity with zero extra starting lives",
+      "RATIONALE": "Cementing Chrome identity as precision skill striker",
+      "TARGET_WORK_PACKAGE": "WP2 / WP7",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_005",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Centipede Body Segment XP Bounty",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "40 XP per segment; 300 XP stage clear",
+      "RATIONALE": "Provides meaningful progression incentive for killing hazards",
+      "TARGET_WORK_PACKAGE": "WP2 / WP8",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_006",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Points Crystal Score Scaling",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "250 base scaled by score.multiplier",
+      "RATIONALE": "Keeps points crystal valuable in high-multiplier runs",
+      "TARGET_WORK_PACKAGE": "WP2 / WP3",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_007",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Emerald Ghost Mode Duration Clamp",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Clamped to [2.0s..15.0s] bounds",
+      "RATIONALE": "Prevents infinite invulnerability stacking",
+      "TARGET_WORK_PACKAGE": "WP2 / WP5",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_008",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Laser Corridor Neutralization Stacking",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Max 2 emitters disabled per stage",
+      "RATIONALE": "Preserves puzzle integrity on later stages",
+      "TARGET_WORK_PACKAGE": "WP2 / WP10",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_009",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Quake Hammer Blast Radius Stacking",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Limited to +25% radius (clamped to 6.0 tileWidths)",
+      "RATIONALE": "Prevents single bomb full-board wipeouts",
+      "TARGET_WORK_PACKAGE": "WP2 / WP10",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_010",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Radiant Bulwark Self-Damage Rule",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Complete self-damage immunity flag",
+      "RATIONALE": "Enables aggressive point-blank bombing playstyle",
+      "TARGET_WORK_PACKAGE": "WP2 / WP10",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_011",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Stage Obstacle Density Ratio Ceiling",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Hard clamp at 0.25 (25% obstacle ratio)",
+      "RATIONALE": "Guarantees BFS solvability across all procedural stages",
+      "TARGET_WORK_PACKAGE": "WP2 / WP11",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_012",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Cylinder Enemy Patrol Speed Bounds",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "[0.055..0.085] world units/s",
+      "RATIONALE": "Preserves dodging window for all ball types",
+      "TARGET_WORK_PACKAGE": "WP2 / WP11",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_013",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Guidance Marker Delay Standardization",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "10.0 seconds inactivity trigger",
+      "RATIONALE": "Ensures subtle player assistance without nagging",
+      "TARGET_WORK_PACKAGE": "WP2 / WP3",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_014",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Dragon Companion Roam Duration Scaling",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "6.0s base + 4.0s with Dragon Horn",
+      "RATIONALE": "Prevents infinite board clearing automation",
+      "TARGET_WORK_PACKAGE": "WP2 / WP10",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_015",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Laser Rain Strike Beam Density",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "14 vertical beams sweeping across board",
+      "RATIONALE": "Provides reliable tile clearing without frame drops",
+      "TARGET_WORK_PACKAGE": "WP2 / WP10",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_016",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Countdown Tile Explosion Score Yield",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "250 points on detonation",
+      "RATIONALE": "Rewards risky board management",
+      "TARGET_WORK_PACKAGE": "WP2 / WP3",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_017",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Shop Portal Conquered Tile Threshold",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "Spawns at 40% conquered board tiles",
+      "RATIONALE": "Encourages active stage engagement before shopping",
+      "TARGET_WORK_PACKAGE": "WP2 / WP10",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_018",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Red Coin Spawn Probability Bonus",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "+15% additive probability from Crimson Geode",
+      "RATIONALE": "Makes rare currency farming viable for late-game shop items",
+      "TARGET_WORK_PACKAGE": "WP2 / WP10",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_019",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Amber Core Flat Coin Bonus",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "+5 flat points per Yellow Coin",
+      "RATIONALE": "Enhances early-game economy and score building",
+      "TARGET_WORK_PACKAGE": "WP2 / WP10",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "DECISION_ID": "ODEC_020",
+      "DECISION_TYPE": "BALANCE",
+      "TITLE": "Emerald Relic Crystal Frequency",
+      "STATUS": "APPROVED",
+      "APPROVED_CHOICE": "1 Emerald Crystal per 25 discovered tiles",
+      "RATIONALE": "Provides steady healing stream for endurance runs",
+      "TARGET_WORK_PACKAGE": "WP2 / WP10",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    }
+  ]
+}

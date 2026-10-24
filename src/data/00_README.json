@@ -1,0 +1,151 @@
+{
+  "sheetKey": "00_README",
+  "header": [
+    "SHEET_ID",
+    "FILE_NAME",
+    "TITLE",
+    "ROW_COUNT",
+    "PRIMARY_KEY",
+    "DESCRIPTION",
+    "VALUE_STATUS"
+  ],
+  "rowCount": 15,
+  "exportedAt": "2026-10-24T23:08:30.221Z",
+  "rows": [
+    {
+      "SHEET_ID": "SHEET_00",
+      "FILE_NAME": "00_README.csv",
+      "TITLE": "Master Index and Catalog",
+      "ROW_COUNT": "15",
+      "PRIMARY_KEY": "SHEET_ID",
+      "DESCRIPTION": "Workbook table catalog; status definitions; and validation rules",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "SHEET_ID": "SHEET_01",
+      "FILE_NAME": "01_AUDIT_SUMMARY.csv",
+      "TITLE": "Audit Summary and Scope",
+      "ROW_COUNT": "23",
+      "PRIMARY_KEY": "SUMMARY_ID",
+      "DESCRIPTION": "High-level summary of audited codebase assets and baseline metrics",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SHEET_ID": "SHEET_02",
+      "FILE_NAME": "02_STAT_DICTIONARY.csv",
+      "TITLE": "Canonical Stat Dictionary",
+      "ROW_COUNT": "61",
+      "PRIMARY_KEY": "STAT_ID",
+      "DESCRIPTION": "Comprehensive dictionary of STAT_001 to STAT_061 with clamps and types",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "SHEET_ID": "SHEET_03",
+      "FILE_NAME": "03_BALLS.csv",
+      "TITLE": "Ball Archetype Definitions",
+      "ROW_COUNT": "4",
+      "PRIMARY_KEY": "BALL_ID",
+      "DESCRIPTION": "Ball profiles (Brass; Marble; Wood; Chrome) with baseline and target stats",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SHEET_ID": "SHEET_04",
+      "FILE_NAME": "04_BALL_LEVELS.csv",
+      "TITLE": "Ball Level 1 to 9 Progression Framework",
+      "ROW_COUNT": "36",
+      "PRIMARY_KEY": "BALL_LEVEL_ID",
+      "DESCRIPTION": "Complete 36-row progression matrix detailing milestones and SP rewards",
+      "VALUE_STATUS": "PROVISIONAL_BALANCE"
+    },
+    {
+      "SHEET_ID": "SHEET_05",
+      "FILE_NAME": "05_BALL_SKILLS.csv",
+      "TITLE": "Crystarium Skill Nodes",
+      "ROW_COUNT": "28",
+      "PRIMARY_KEY": "SKILL_ID",
+      "DESCRIPTION": "All 28 Crystarium nodes with Ball Level gates and SP costs",
+      "VALUE_STATUS": "PROVISIONAL_BALANCE"
+    },
+    {
+      "SHEET_ID": "SHEET_06",
+      "FILE_NAME": "06_ABILITIES.csv",
+      "TITLE": "Active and Passive Abilities",
+      "ROW_COUNT": "8",
+      "PRIMARY_KEY": "ABILITY_ID",
+      "DESCRIPTION": "Catalog of 8 abilities including Apex and companion systems",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "SHEET_ID": "SHEET_07",
+      "FILE_NAME": "07_EQUIPMENT.csv",
+      "TITLE": "Shop Equipment and Items",
+      "ROW_COUNT": "21",
+      "PRIMARY_KEY": "ITEM_ID",
+      "DESCRIPTION": "All 21 Shop items mapped to canonical equipment slots and prices",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SHEET_ID": "SHEET_08",
+      "FILE_NAME": "08_MODIFIERS.csv",
+      "TITLE": "Normalized Modifier Registry",
+      "ROW_COUNT": "55",
+      "PRIMARY_KEY": "MODIFIER_ID",
+      "DESCRIPTION": "Normalized modifiers across skills; items; cards; and levels",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    },
+    {
+      "SHEET_ID": "SHEET_09",
+      "FILE_NAME": "09_XP_CURVE.csv",
+      "TITLE": "Ball XP Curve and Reward Bounties",
+      "ROW_COUNT": "14",
+      "PRIMARY_KEY": "ENTRY_ID",
+      "DESCRIPTION": "Monotonic Level 1-9 XP thresholds and gameplay event XP rewards",
+      "VALUE_STATUS": "PROVISIONAL_BALANCE"
+    },
+    {
+      "SHEET_ID": "SHEET_10",
+      "FILE_NAME": "10_SCORE_REWARDS.csv",
+      "TITLE": "Score Reward Registry",
+      "ROW_COUNT": "16",
+      "PRIMARY_KEY": "REWARD_ID",
+      "DESCRIPTION": "Confirmed score event rewards and multiplier interactions",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SHEET_ID": "SHEET_11",
+      "FILE_NAME": "11_BOMB_BALANCE.csv",
+      "TITLE": "Bomb Progression and Comparison Matrix",
+      "ROW_COUNT": "36",
+      "PRIMARY_KEY": "BOMB_LEVEL_ID",
+      "DESCRIPTION": "Cross-ball bomb stat matrix across Levels 1-9 and equipment synergy",
+      "VALUE_STATUS": "CALCULATED"
+    },
+    {
+      "SHEET_ID": "SHEET_12",
+      "FILE_NAME": "12_BALANCE_OVERVIEW.csv",
+      "TITLE": "Cross-Ball Balance Overview",
+      "ROW_COUNT": "16",
+      "PRIMARY_KEY": "COMPARISON_ID",
+      "DESCRIPTION": "Comparative analysis of balls at Levels 1; 3; 6; and 9",
+      "VALUE_STATUS": "CALCULATED"
+    },
+    {
+      "SHEET_ID": "SHEET_13",
+      "FILE_NAME": "13_SOURCE_TRACEABILITY.csv",
+      "TITLE": "Source Traceability Matrix",
+      "ROW_COUNT": "20",
+      "PRIMARY_KEY": "TRACE_ID",
+      "DESCRIPTION": "Bidirectional mapping between workbook data and runtime source code",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SHEET_ID": "SHEET_14",
+      "FILE_NAME": "14_DECISIONS_AND_ASSUMPTIONS.csv",
+      "TITLE": "Decisions and Assumptions Register",
+      "ROW_COUNT": "41",
+      "PRIMARY_KEY": "DECISION_ID",
+      "DESCRIPTION": "Complete log of approved decisions (DEC_001-021) and open resolutions",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    }
+  ]
+}

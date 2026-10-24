@@ -1,0 +1,529 @@
+{
+  "meta": {
+    "image": "icon-atlas.png",
+    "size": {
+      "w": 2048,
+      "h": 2048
+    },
+    "grid": {
+      "cols": 8,
+      "rows": 8,
+      "cellSize": 256
+    },
+    "totalIcons": 64
+  },
+  "frames": {
+    "coin_yellow": {
+      "x": 0,
+      "y": 0,
+      "width": 256,
+      "height": 256,
+      "row": 0,
+      "col": 0
+    },
+    "coin_red": {
+      "x": 256,
+      "y": 0,
+      "width": 256,
+      "height": 256,
+      "row": 0,
+      "col": 1
+    },
+    "timer": {
+      "x": 512,
+      "y": 0,
+      "width": 256,
+      "height": 256,
+      "row": 0,
+      "col": 2
+    },
+    "heart": {
+      "x": 768,
+      "y": 0,
+      "width": 256,
+      "height": 256,
+      "row": 0,
+      "col": 3
+    },
+    "lightning": {
+      "x": 1024,
+      "y": 0,
+      "width": 256,
+      "height": 256,
+      "row": 0,
+      "col": 4
+    },
+    "bomb": {
+      "x": 1280,
+      "y": 0,
+      "width": 256,
+      "height": 256,
+      "row": 0,
+      "col": 5
+    },
+    "pause": {
+      "x": 1536,
+      "y": 0,
+      "width": 256,
+      "height": 256,
+      "row": 0,
+      "col": 6
+    },
+    "trophy": {
+      "x": 1792,
+      "y": 0,
+      "width": 256,
+      "height": 256,
+      "row": 0,
+      "col": 7
+    },
+    "target": {
+      "x": 0,
+      "y": 256,
+      "width": 256,
+      "height": 256,
+      "row": 1,
+      "col": 0
+    },
+    "shop_bag": {
+      "x": 256,
+      "y": 256,
+      "width": 256,
+      "height": 256,
+      "row": 1,
+      "col": 1
+    },
+    "crystal": {
+      "x": 512,
+      "y": 256,
+      "width": 256,
+      "height": 256,
+      "row": 1,
+      "col": 2
+    },
+    "close": {
+      "x": 768,
+      "y": 256,
+      "width": 256,
+      "height": 256,
+      "row": 1,
+      "col": 3
+    },
+    "cart": {
+      "x": 1024,
+      "y": 256,
+      "width": 256,
+      "height": 256,
+      "row": 1,
+      "col": 4
+    },
+    "money_bag": {
+      "x": 1280,
+      "y": 256,
+      "width": 256,
+      "height": 256,
+      "row": 1,
+      "col": 5
+    },
+    "package": {
+      "x": 1536,
+      "y": 256,
+      "width": 256,
+      "height": 256,
+      "row": 1,
+      "col": 6
+    },
+    "warning": {
+      "x": 1792,
+      "y": 256,
+      "width": 256,
+      "height": 256,
+      "row": 1,
+      "col": 7
+    },
+    "ring": {
+      "x": 0,
+      "y": 512,
+      "width": 256,
+      "height": 256,
+      "row": 2,
+      "col": 0
+    },
+    "potion": {
+      "x": 256,
+      "y": 512,
+      "width": 256,
+      "height": 256,
+      "row": 2,
+      "col": 1
+    },
+    "swords": {
+      "x": 512,
+      "y": 512,
+      "width": 256,
+      "height": 256,
+      "row": 2,
+      "col": 2
+    },
+    "shield": {
+      "x": 768,
+      "y": 512,
+      "width": 256,
+      "height": 256,
+      "row": 2,
+      "col": 3
+    },
+    "crystal_orb": {
+      "x": 1024,
+      "y": 512,
+      "width": 256,
+      "height": 256,
+      "row": 2,
+      "col": 4
+    },
+    "magnet": {
+      "x": 1280,
+      "y": 512,
+      "width": 256,
+      "height": 256,
+      "row": 2,
+      "col": 5
+    },
+    "hourglass": {
+      "x": 1536,
+      "y": 512,
+      "width": 256,
+      "height": 256,
+      "row": 2,
+      "col": 6
+    },
+    "clover": {
+      "x": 1792,
+      "y": 512,
+      "width": 256,
+      "height": 256,
+      "row": 2,
+      "col": 7
+    },
+    "heart_sparkle": {
+      "x": 0,
+      "y": 768,
+      "width": 256,
+      "height": 256,
+      "row": 3,
+      "col": 0
+    },
+    "dagger": {
+      "x": 256,
+      "y": 768,
+      "width": 256,
+      "height": 256,
+      "row": 3,
+      "col": 1
+    },
+    "hammer": {
+      "x": 512,
+      "y": 768,
+      "width": 256,
+      "height": 256,
+      "row": 3,
+      "col": 2
+    },
+    "dragon": {
+      "x": 768,
+      "y": 768,
+      "width": 256,
+      "height": 256,
+      "row": 3,
+      "col": 3
+    },
+    "diamond_dot": {
+      "x": 1024,
+      "y": 768,
+      "width": 256,
+      "height": 256,
+      "row": 3,
+      "col": 4
+    },
+    "sparkles": {
+      "x": 1280,
+      "y": 768,
+      "width": 256,
+      "height": 256,
+      "row": 3,
+      "col": 5
+    },
+    "diamond_orange": {
+      "x": 1536,
+      "y": 768,
+      "width": 256,
+      "height": 256,
+      "row": 3,
+      "col": 6
+    },
+    "diamond_red": {
+      "x": 1792,
+      "y": 768,
+      "width": 256,
+      "height": 256,
+      "row": 3,
+      "col": 7
+    },
+    "heart_green": {
+      "x": 0,
+      "y": 1024,
+      "width": 256,
+      "height": 256,
+      "row": 4,
+      "col": 0
+    },
+    "ball_white": {
+      "x": 256,
+      "y": 1024,
+      "width": 256,
+      "height": 256,
+      "row": 4,
+      "col": 1
+    },
+    "ball_yellow": {
+      "x": 512,
+      "y": 1024,
+      "width": 256,
+      "height": 256,
+      "row": 4,
+      "col": 2
+    },
+    "ball_wood": {
+      "x": 768,
+      "y": 1024,
+      "width": 256,
+      "height": 256,
+      "row": 4,
+      "col": 3
+    },
+    "ball_purple": {
+      "x": 1024,
+      "y": 1024,
+      "width": 256,
+      "height": 256,
+      "row": 4,
+      "col": 4
+    },
+    "tennis_ball": {
+      "x": 1280,
+      "y": 1024,
+      "width": 256,
+      "height": 256,
+      "row": 4,
+      "col": 5
+    },
+    "joystick": {
+      "x": 1536,
+      "y": 1024,
+      "width": 256,
+      "height": 256,
+      "row": 4,
+      "col": 6
+    },
+    "lock": {
+      "x": 1792,
+      "y": 1024,
+      "width": 256,
+      "height": 256,
+      "row": 4,
+      "col": 7
+    },
+    "star": {
+      "x": 0,
+      "y": 1280,
+      "width": 256,
+      "height": 256,
+      "row": 5,
+      "col": 0
+    },
+    "wind": {
+      "x": 256,
+      "y": 1280,
+      "width": 256,
+      "height": 256,
+      "row": 5,
+      "col": 1
+    },
+    "card": {
+      "x": 512,
+      "y": 1280,
+      "width": 256,
+      "height": 256,
+      "row": 5,
+      "col": 2
+    },
+    "palette": {
+      "x": 768,
+      "y": 1280,
+      "width": 256,
+      "height": 256,
+      "row": 5,
+      "col": 3
+    },
+    "gamepad": {
+      "x": 1024,
+      "y": 1280,
+      "width": 256,
+      "height": 256,
+      "row": 5,
+      "col": 4
+    },
+    "phone": {
+      "x": 1280,
+      "y": 1280,
+      "width": 256,
+      "height": 256,
+      "row": 5,
+      "col": 5
+    },
+    "rotate": {
+      "x": 1536,
+      "y": 1280,
+      "width": 256,
+      "height": 256,
+      "row": 5,
+      "col": 6
+    },
+    "arrow_forward": {
+      "x": 1792,
+      "y": 1280,
+      "width": 256,
+      "height": 256,
+      "row": 5,
+      "col": 7
+    },
+    "zoom_in": {
+      "x": 0,
+      "y": 1536,
+      "width": 256,
+      "height": 256,
+      "row": 6,
+      "col": 0
+    },
+    "zoom_out": {
+      "x": 256,
+      "y": 1536,
+      "width": 256,
+      "height": 256,
+      "row": 6,
+      "col": 1
+    },
+    "reset_view": {
+      "x": 512,
+      "y": 1536,
+      "width": 256,
+      "height": 256,
+      "row": 6,
+      "col": 2
+    },
+    "undo": {
+      "x": 768,
+      "y": 1536,
+      "width": 256,
+      "height": 256,
+      "row": 6,
+      "col": 3
+    },
+    "redo": {
+      "x": 1024,
+      "y": 1536,
+      "width": 256,
+      "height": 256,
+      "row": 6,
+      "col": 4
+    },
+    "diff": {
+      "x": 1280,
+      "y": 1536,
+      "width": 256,
+      "height": 256,
+      "row": 6,
+      "col": 5
+    },
+    "camera": {
+      "x": 1536,
+      "y": 1536,
+      "width": 256,
+      "height": 256,
+      "row": 6,
+      "col": 6
+    },
+    "export_box": {
+      "x": 1792,
+      "y": 1536,
+      "width": 256,
+      "height": 256,
+      "row": 6,
+      "col": 7
+    },
+    "import_box": {
+      "x": 0,
+      "y": 1792,
+      "width": 256,
+      "height": 256,
+      "row": 7,
+      "col": 0
+    },
+    "save_disk": {
+      "x": 256,
+      "y": 1792,
+      "width": 256,
+      "height": 256,
+      "row": 7,
+      "col": 1
+    },
+    "check_mark": {
+      "x": 512,
+      "y": 1792,
+      "width": 256,
+      "height": 256,
+      "row": 7,
+      "col": 2
+    },
+    "balance_scale": {
+      "x": 768,
+      "y": 1792,
+      "width": 256,
+      "height": 256,
+      "row": 7,
+      "col": 3
+    },
+    "chart_bar": {
+      "x": 1024,
+      "y": 1792,
+      "width": 256,
+      "height": 256,
+      "row": 7,
+      "col": 4
+    },
+    "chart_up": {
+      "x": 1280,
+      "y": 1792,
+      "width": 256,
+      "height": 256,
+      "row": 7,
+      "col": 5
+    },
+    "bug": {
+      "x": 1536,
+      "y": 1792,
+      "width": 256,
+      "height": 256,
+      "row": 7,
+      "col": 6
+    },
+    "app_icon": {
+      "x": 1792,
+      "y": 1792,
+      "width": 256,
+      "height": 256,
+      "row": 7,
+      "col": 7
+    }
+  }
+}

@@ -1,0 +1,217 @@
+{
+  "sheetKey": "13_SOURCE_TRACEABILITY",
+  "header": [
+    "TRACE_ID",
+    "WORKBOOK_SHEET",
+    "CANONICAL_DOMAIN",
+    "SOURCE_FILE",
+    "SOURCE_SYMBOL_OR_LINE",
+    "AUDIT_CSV_REFERENCE",
+    "WP_TARGET",
+    "VALUE_STATUS"
+  ],
+  "rowCount": 20,
+  "exportedAt": "2026-10-24T23:08:30.546Z",
+  "rows": [
+    {
+      "TRACE_ID": "TRC_001",
+      "WORKBOOK_SHEET": "02_STAT_DICTIONARY",
+      "CANONICAL_DOMAIN": "ball.speedScale",
+      "SOURCE_FILE": "flipper_app/src/collision/CollisionSystem.js",
+      "SOURCE_SYMBOL_OR_LINE": "_speedScale (L42)",
+      "AUDIT_CSV_REFERENCE": "11_stat_dictionary.csv (STAT_005)",
+      "WP_TARGET": "WP5",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_002",
+      "WORKBOOK_SHEET": "02_STAT_DICTIONARY",
+      "CANONICAL_DOMAIN": "ball.wallRestitution",
+      "SOURCE_FILE": "flipper_app/src/collision/CollisionSystem.js",
+      "SOURCE_SYMBOL_OR_LINE": "_wallRestitution (L43)",
+      "AUDIT_CSV_REFERENCE": "11_stat_dictionary.csv (STAT_006)",
+      "WP_TARGET": "WP5",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_003",
+      "WORKBOOK_SHEET": "02_STAT_DICTIONARY",
+      "CANONICAL_DOMAIN": "bomb.capacity",
+      "SOURCE_FILE": "flipper_app/src/gameplay/BombSystem.js",
+      "SOURCE_SYMBOL_OR_LINE": "_bombCount (L28)",
+      "AUDIT_CSV_REFERENCE": "27_balance_data_gaps.csv (GAP_003)",
+      "WP_TARGET": "WP6",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_004",
+      "WORKBOOK_SHEET": "02_STAT_DICTIONARY",
+      "CANONICAL_DOMAIN": "bomb.fuseDurationSeconds",
+      "SOURCE_FILE": "flipper_app/src/gameplay/BombSystem.js",
+      "SOURCE_SYMBOL_OR_LINE": "fuseDuration: 3.0 (L176)",
+      "AUDIT_CSV_REFERENCE": "13_hardcoded_values.csv (HC_018)",
+      "WP_TARGET": "WP6",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_005",
+      "WORKBOOK_SHEET": "02_STAT_DICTIONARY",
+      "CANONICAL_DOMAIN": "bomb.blastRadiusMultiplier",
+      "SOURCE_FILE": "flipper_app/src/gameplay/BombSystem.js",
+      "SOURCE_SYMBOL_OR_LINE": "blastRadius: tileWidth * 3.4 (L177)",
+      "AUDIT_CSV_REFERENCE": "13_hardcoded_values.csv (HC_019)",
+      "WP_TARGET": "WP6",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_006",
+      "WORKBOOK_SHEET": "02_STAT_DICTIONARY",
+      "CANONICAL_DOMAIN": "score.multiplier",
+      "SOURCE_FILE": "flipper_app/src/gameplay/ScoreSystem.js",
+      "SOURCE_SYMBOL_OR_LINE": "_multiplier (L15)",
+      "AUDIT_CSV_REFERENCE": "11_stat_dictionary.csv (STAT_019)",
+      "WP_TARGET": "WP5",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_007",
+      "WORKBOOK_SHEET": "02_STAT_DICTIONARY",
+      "CANONICAL_DOMAIN": "input.tiltSensitivity",
+      "SOURCE_FILE": "flipper_app/src/input/InputManager.js",
+      "SOURCE_SYMBOL_OR_LINE": "tiltSensitivity (L18)",
+      "AUDIT_CSV_REFERENCE": "26_bugs_incomplete_systems.csv (BUG_009)",
+      "WP_TARGET": "WP1",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_008",
+      "WORKBOOK_SHEET": "03_BALLS",
+      "CANONICAL_DOMAIN": "BALL_001 (brass)",
+      "SOURCE_FILE": "flipper_app/src/materials/ballMaterials.js",
+      "SOURCE_SYMBOL_OR_LINE": "createBallMaterial('brass')",
+      "AUDIT_CSV_REFERENCE": "04_balls.csv (BALL_001)",
+      "WP_TARGET": "WP7",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_009",
+      "WORKBOOK_SHEET": "03_BALLS",
+      "CANONICAL_DOMAIN": "BALL_002 (marble)",
+      "SOURCE_FILE": "flipper_app/src/materials/ballMaterials.js",
+      "SOURCE_SYMBOL_OR_LINE": "createBallMaterial('marble')",
+      "AUDIT_CSV_REFERENCE": "04_balls.csv (BALL_002)",
+      "WP_TARGET": "WP7",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_010",
+      "WORKBOOK_SHEET": "03_BALLS",
+      "CANONICAL_DOMAIN": "BALL_003 (wood)",
+      "SOURCE_FILE": "flipper_app/src/materials/ballMaterials.js",
+      "SOURCE_SYMBOL_OR_LINE": "createBallMaterial('wood')",
+      "AUDIT_CSV_REFERENCE": "04_balls.csv (BALL_003)",
+      "WP_TARGET": "WP7",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_011",
+      "WORKBOOK_SHEET": "03_BALLS",
+      "CANONICAL_DOMAIN": "BALL_004 (chrome)",
+      "SOURCE_FILE": "flipper_app/src/materials/ballMaterials.js",
+      "SOURCE_SYMBOL_OR_LINE": "createBallMaterial('chrome')",
+      "AUDIT_CSV_REFERENCE": "04_balls.csv (BALL_004)",
+      "WP_TARGET": "WP7",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_012",
+      "WORKBOOK_SHEET": "05_BALL_SKILLS",
+      "CANONICAL_DOMAIN": "Crystarium Nodes 1..28",
+      "SOURCE_FILE": "flipper_app/src/development/DevelopmentConfig.js",
+      "SOURCE_SYMBOL_OR_LINE": "CRYSTARIUM_TREES (L54-L248)",
+      "AUDIT_CSV_REFERENCE": "09_skills.csv (SKILL_001..SKILL_028)",
+      "WP_TARGET": "WP9",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_013",
+      "WORKBOOK_SHEET": "06_ABILITIES",
+      "CANONICAL_DOMAIN": "ABIL_001 (Bomb Drop)",
+      "SOURCE_FILE": "flipper_app/src/gameplay/BombSystem.js",
+      "SOURCE_SYMBOL_OR_LINE": "BombSystem.dropBomb() (L158)",
+      "AUDIT_CSV_REFERENCE": "08_abilities.csv (ABIL_001)",
+      "WP_TARGET": "WP6",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_014",
+      "WORKBOOK_SHEET": "06_ABILITIES",
+      "CANONICAL_DOMAIN": "ABIL_002 (Dragon Ally)",
+      "SOURCE_FILE": "flipper_app/src/gameplay/DragonSystem.js",
+      "SOURCE_SYMBOL_OR_LINE": "DragonSystem.spawn() (L84)",
+      "AUDIT_CSV_REFERENCE": "08_abilities.csv (ABIL_002)",
+      "WP_TARGET": "WP10",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_015",
+      "WORKBOOK_SHEET": "06_ABILITIES",
+      "CANONICAL_DOMAIN": "ABIL_003 (Laser Rain)",
+      "SOURCE_FILE": "flipper_app/src/gameplay/LaserRainSystem.js",
+      "SOURCE_SYMBOL_OR_LINE": "LaserRainSystem.triggerStrike() (L71)",
+      "AUDIT_CSV_REFERENCE": "08_abilities.csv (ABIL_003)",
+      "WP_TARGET": "WP10",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_016",
+      "WORKBOOK_SHEET": "07_EQUIPMENT",
+      "CANONICAL_DOMAIN": "ITEM_001..ITEM_021",
+      "SOURCE_FILE": "flipper_app/src/shop/ItemDatabase.js",
+      "SOURCE_SYMBOL_OR_LINE": "ITEM_DATABASE (L6-L393)",
+      "AUDIT_CSV_REFERENCE": "10_equipment_items.csv (ITEM_001..ITEM_021)",
+      "WP_TARGET": "WP10",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_017",
+      "WORKBOOK_SHEET": "09_XP_CURVE",
+      "CANONICAL_DOMAIN": "Ball Leveling & XP",
+      "SOURCE_FILE": "flipper_app/src/development/ProgressionManager.js",
+      "SOURCE_SYMBOL_OR_LINE": "None (new in target architecture)",
+      "AUDIT_CSV_REFERENCE": "16_xp_rules.csv (NO_CONFIRMED_DATA)",
+      "WP_TARGET": "WP8",
+      "VALUE_STATUS": "PROVISIONAL_BALANCE"
+    },
+    {
+      "TRACE_ID": "TRC_018",
+      "WORKBOOK_SHEET": "10_SCORE_REWARDS",
+      "CANONICAL_DOMAIN": "REW_001..REW_015",
+      "SOURCE_FILE": "flipper_app/src/gameplay/ScoreSystem.js",
+      "SOURCE_SYMBOL_OR_LINE": "addPoints() / eventBus listeners",
+      "AUDIT_CSV_REFERENCE": "17_score_rewards.csv (REW_001..REW_016)",
+      "WP_TARGET": "WP1",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_019",
+      "WORKBOOK_SHEET": "10_SCORE_REWARDS",
+      "CANONICAL_DOMAIN": "REW_014/REW_015 (Centipede)",
+      "SOURCE_FILE": "flipper_app/src/gameplay/CentipedeSystem.js",
+      "SOURCE_SYMBOL_OR_LINE": "score:add emitter (L642/L654)",
+      "AUDIT_CSV_REFERENCE": "26_bugs_incomplete_systems.csv (BUG_001)",
+      "WP_TARGET": "WP1",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "TRACE_ID": "TRC_020",
+      "WORKBOOK_SHEET": "11_BOMB_BALANCE",
+      "CANONICAL_DOMAIN": "Bomb Pilot Mechanics",
+      "SOURCE_FILE": "flipper_app/src/gameplay/BombSystem.js",
+      "SOURCE_SYMBOL_OR_LINE": "_detonateBomb() (L210)",
+      "AUDIT_CSV_REFERENCE": "bomb-rules-matrix.csv (BOMB_RULE_001..027)",
+      "WP_TARGET": "WP6",
+      "VALUE_STATUS": "APPROVED_DESIGN"
+    }
+  ]
+}

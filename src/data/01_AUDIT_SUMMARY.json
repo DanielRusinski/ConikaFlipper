@@ -1,0 +1,223 @@
+{
+  "sheetKey": "01_AUDIT_SUMMARY",
+  "header": [
+    "SUMMARY_ID",
+    "CATEGORY",
+    "METRIC",
+    "VALUE",
+    "CONFIDENCE",
+    "NOTES",
+    "VALUE_STATUS"
+  ],
+  "rowCount": 23,
+  "exportedAt": "2026-10-24T23:08:30.241Z",
+  "rows": [
+    {
+      "SUMMARY_ID": "SUM_001",
+      "CATEGORY": "PROJECT_FILES",
+      "METRIC": "Total Project Files Audited in 01_project_files.csv",
+      "VALUE": "129",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "Recorded in 01_project_files.csv: 113 JS files; 7 CSS; 2 JSON; 1 HTML; 1 MD; 1 SVG; 2 GLB; 1 EXR; 2 PNG",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_002",
+      "CATEGORY": "PROJECT_FILES",
+      "METRIC": "Active vs Inactive/Orphaned Project Files",
+      "VALUE": "113 Active; 10 Inactive/Orphaned; 5 Test/Prototype; 1 Legacy Doc",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "8 orphaned code/shader files in src/; 1 fallback texture; 1 editor config",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_003",
+      "CATEGORY": "GAMEPLAY_SYSTEMS",
+      "METRIC": "Total Audited Systems",
+      "VALUE": "30",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "23 WORKING; 6 PARTIALLY WORKING; 1 PRESENT BUT DISCONNECTED (BattleMenuSystem)",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_004",
+      "CATEGORY": "ENTITIES",
+      "METRIC": "Total Audited Entity Types",
+      "VALUE": "32",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "Recorded in 03_entities.csv (ENT_001..ENT_032)",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_005",
+      "CATEGORY": "BALLS",
+      "METRIC": "Total Playable Ball Types",
+      "VALUE": "4",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "BALL_001..BALL_004: Brass; Marble; Wood; Chrome",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_006",
+      "CATEGORY": "ENEMIES",
+      "METRIC": "Total Enemy & Lethal Hazard Types",
+      "VALUE": "3",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "Cylinder Enemy; Centipede; Laser Corridor Hazard",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_007",
+      "CATEGORY": "BARRIERS",
+      "METRIC": "Total Barrier & Obstacle Types",
+      "VALUE": "6",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "Cyan/Pink/Purple Jelly Columns; BorderWall; Laser Hazard Beam; Countdown Bomb Tile",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_008",
+      "CATEGORY": "PICKUPS_AND_BONUSES",
+      "METRIC": "Total Pickups; Currencies; and Modifier Cards",
+      "VALUE": "11",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "3 Crystals; 2 Coins; 6 Modifier Cards",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_009",
+      "CATEGORY": "ABILITIES",
+      "METRIC": "Total Audited Abilities",
+      "VALUE": "8",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "3 Working Active Abilities; 1 Disconnected Slow-Mo Menu; 4 Placeholder Apex Abilities",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_010",
+      "CATEGORY": "SKILLS",
+      "METRIC": "Total Crystarium Skill Tree Nodes",
+      "VALUE": "28",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "4 balls x 7 nodes across 3 stages; 6 fully working; 6 partial; 16 disconnected in v1",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_011",
+      "CATEGORY": "EQUIPMENT_AND_SHOP",
+      "METRIC": "Total Shop Catalog Items",
+      "VALUE": "21",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "21 catalog items in ItemDatabase.js; 5 working at runtime; 16 placeholders in v1",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_012",
+      "CATEGORY": "STATS",
+      "METRIC": "Total Unique Audited Gameplay Stats",
+      "VALUE": "45",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "Recorded in 11_stat_dictionary.csv (STAT_001..STAT_045); expanded to 61 in canonical dictionary",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_013",
+      "CATEGORY": "HARDCODED_VALUES",
+      "METRIC": "Total Significant Hard-Coded Gameplay Values Cataloged",
+      "VALUE": "55",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "Recorded in 13_hardcoded_values.csv (HC_001..HC_055)",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_014",
+      "CATEGORY": "MODIFIERS",
+      "METRIC": "Total Cataloged Stat Modifiers",
+      "VALUE": "46",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "24 Crystarium; 4 Modifier Card; 17 Shop item; 1 UI slider override; 31 disconnected/buggy in v1",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_015",
+      "CATEGORY": "PROGRESSION",
+      "METRIC": "Total Progression Mechanisms Audited",
+      "VALUE": "5",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "Stage Progression; Crystarium Tree; Stage Gate; Shop Unlocks; Planned 9-Level Ball System",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_016",
+      "CATEGORY": "XP_RULES",
+      "METRIC": "Total Confirmed XP Rules",
+      "VALUE": "0",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "Zero XP runtime code in v1 baseline; game used ephemeral Score and persistent Coins",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_017",
+      "CATEGORY": "SCORE_REWARDS",
+      "METRIC": "Total Score Reward Rules Audited",
+      "VALUE": "16",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "REW_001..REW_016: 13 Working; 2 Broken Centipede rules (fixed in WP1); 1 Unused config",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_018",
+      "CATEGORY": "SPAWN_AND_DROP_RULES",
+      "METRIC": "Total Spawn and Drop Rules Audited",
+      "VALUE": "16",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "10 Spawn Rules (SPWN_001..SPWN_010) and 6 Drop Rules (DROP_001..DROP_006)",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_019",
+      "CATEGORY": "COLLISIONS_AND_TIMERS",
+      "METRIC": "Total Collision Interactions and Timers Audited",
+      "VALUE": "37",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "15 Collision Interactions and 22 Timers/Cooldowns",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_020",
+      "CATEGORY": "SAVE_AND_UI",
+      "METRIC": "Total Save Fields and UI Bindings Audited",
+      "VALUE": "28",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "8 Save Fields in LocalStorage and 20 UI screen bindings",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_021",
+      "CATEGORY": "ISSUES_AND_RISKS",
+      "METRIC": "Total Duplicates; Bugs; Gaps; and Risks Cataloged",
+      "VALUE": "42",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "14 Duplicates/Conflicts; 10 Bugs; 10 Balance Data Gaps; 8 Migration Risks",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_022",
+      "CATEGORY": "READINESS_SCORE",
+      "METRIC": "Average Balance Readiness Score",
+      "VALUE": "2.08 / 5.00",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "Limited readiness prior to foundation overhaul; foundation established in WP2",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    },
+    {
+      "SUMMARY_ID": "SUM_023",
+      "CATEGORY": "AUDIT_COMPLIANCE",
+      "METRIC": "Application Source Files Modified During Audit",
+      "VALUE": "0",
+      "CONFIDENCE": "HIGH",
+      "NOTES": "100% read-only audit compliance preserved",
+      "VALUE_STATUS": "CONFIRMED_BASELINE"
+    }
+  ]
+}
